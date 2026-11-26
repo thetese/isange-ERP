@@ -90,6 +90,16 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
                 CREATE INDEX IF NOT EXISTS idx_odoo_vercel_sessions_updated_at
                     ON public.odoo_vercel_sessions (updated_at)
             """)
+            cr.execute("ALTER TABLE public.odoo_vercel_sessions ENABLE ROW LEVEL SECURITY")
+            cr.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                        REVOKE ALL ON TABLE public.odoo_vercel_sessions FROM PUBLIC, anon, authenticated;
+                    END IF;
+                END
+                $$
+            """)
             _TABLE_READY = True
 
     @contextlib.contextmanager

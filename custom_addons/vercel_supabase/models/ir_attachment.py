@@ -148,6 +148,16 @@ class IrAttachment(models.Model):
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                 """)
+                gc_cr.execute("ALTER TABLE public.odoo_vercel_filestore_gc ENABLE ROW LEVEL SECURITY")
+                gc_cr.execute("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                            REVOKE ALL ON TABLE public.odoo_vercel_filestore_gc FROM PUBLIC, anon, authenticated;
+                        END IF;
+                    END
+                    $$
+                """)
             _GC_TABLE_READY = True
 
     @api.model
