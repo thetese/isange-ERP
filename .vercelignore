@@ -1,0 +1,43 @@
+# Exclude non-runtime files from Vercel deployment bundles
+.git
+.github
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.env
+.env.*
+!.env.example
+odoo-19.0.tar.gz
+
+# Odoo docs, packaging, and test assets not needed at runtime
+doc
+debian
+setup
+**/tests
+**/static/tests
+**/demo
+# Exclude non-English .po translation files (~875 MB across 400+ addons!).
+# English (en_US) is built directly into source files and needs NO .po files.
+# This shrinks the ENTIRE 400+ addon Odoo 19 codebase to ~187 MB so it fits
+# inside Vercel's default 500 MB Python bundle limit without deleting any addons!
+# To include a specific language (e.g. French), add `!**/*/i18n/fr.po` below
+# (or remove `**/*.po` and set VERCEL_SUPPORT_LARGE_FUNCTIONS=1 in Vercel).
+**/*.po
+README*.md
+LICENSE
+COPYRIGHT
+CONTRIBUTING.md
+SECURITY.md
+Makefile
+requirements.odoo.txt
+
+# Local helper scripts & SQL migrations
+scripts
+supabase

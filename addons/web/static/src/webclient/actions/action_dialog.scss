@@ -1,0 +1,23 @@
+.modal.o_technical_modal {
+    .modal-content {
+        .modal-body.o_act_window {
+            padding: 0;
+
+            @include media-breakpoint-down(md) {
+                display: flex;
+                flex-direction: column;
+
+                .o_action {
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                }
+
+                > .o_calendar_view {
+                    flex-basis: 100vh;
+                    min-height: 0;
+                }
+            }
+        }
+    }
+}
