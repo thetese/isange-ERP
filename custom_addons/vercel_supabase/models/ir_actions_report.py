@@ -26,6 +26,7 @@ import re
 import tempfile
 from urllib.parse import parse_qs, unquote, urlsplit
 
+import lxml.etree
 import lxml.html
 import requests
 
@@ -99,8 +100,9 @@ strong, b, .fw-bold, .font-weight-bold { font-weight: bold; }
 
 /* Company logo & header */
 img { max-width: 100%; }
-.o_company_logo, .o_company_logo_small {
-    max-height: 48pt;
+ul.list-unstyled { list-style-type: none; margin: 0; padding: 0; }
+.o_company_logo, .o_company_logo_small, .o_company_logo_big {
+    max-height: 46pt;
     width: auto;
 }
 .header {
@@ -116,6 +118,10 @@ img { max-width: 100%; }
     border-top: 0.75pt solid #d1d5db;
     padding-top: 4pt;
     text-align: center;
+}
+.isange_bank_details table {
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 /* Tables (Quotations, Pro-Forma Invoices, Customer Invoices) */
@@ -418,13 +424,31 @@ class IrActionsReport(models.Model):
         except Exception:
             return html_str
 
-        # Inline <img src="...">
+        # Inline <img src="..."> (converting WebP -> PNG for ReportLab compatibility)
         for img in doc.xpath('.//img[@src]'):
             src = img.get('src') or ''
             if src.startswith('data:'):
+                if src.startswith('data:image/webp;base64,'):
+                    try:
+                        from PIL import Image  # noqa: PLC0415
+                        raw_webp = base64.b64decode(src.split(',', 1)[1])
+                        buf = io.BytesIO()
+                        Image.open(io.BytesIO(raw_webp)).convert('RGBA').save(buf, format='PNG')
+                        img.set('src', 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii'))
+                    except Exception:
+                        pass
                 continue
             raw, mimetype = self._resolve_odoo_asset(src)
             if raw:
+                if (mimetype or '').lower() == 'image/webp':
+                    try:
+                        from PIL import Image  # noqa: PLC0415
+                        buf = io.BytesIO()
+                        Image.open(io.BytesIO(raw)).convert('RGBA').save(buf, format='PNG')
+                        raw = buf.getvalue()
+                        mimetype = 'image/png'
+                    except Exception:
+                        pass
                 b64 = base64.b64encode(raw).decode('ascii')
                 img.set('src', f"data:{mimetype or 'image/png'};base64,{b64}")
 
@@ -445,6 +469,25 @@ class IrActionsReport(models.Model):
                 parent = link.getparent()
                 if parent is not None:
                     parent.remove(link)
+
+        # In xhtml2pdf mode (inline_stylesheets=False), remove embedded CSS3 <style> blocks
+        # and sanitize inline style declarations using CSS3 var()/calc() unsupported by CSS2.1
+        if not inline_stylesheets:
+            for st in doc.xpath('.//style'):
+                parent = st.getparent()
+                if parent is not None:
+                    parent.remove(st)
+            for el in doc.xpath('.//*[@style]'):
+                style_val = el.get('style') or ''
+                if 'var(' in style_val or 'calc(' in style_val or 'clamp(' in style_val:
+                    kept_decls = [
+                        decl for decl in style_val.split(';')
+                        if decl.strip() and 'var(' not in decl and 'calc(' not in decl and 'clamp(' not in decl
+                    ]
+                    if kept_decls:
+                        el.set('style', '; '.join(kept_decls))
+                    else:
+                        el.attrib.pop('style', None)
 
         # Strip <script> tags (not needed in static PDF rendering)
         for script in doc.xpath('.//script'):
@@ -567,10 +610,10 @@ class IrActionsReport(models.Model):
                 continue
             tbl = lxml.html.Element('table')
             tbl.set('class', 'o_layout_grid')
-            tr = lxml.html.SubElement(tbl, 'tr')
+            tr = lxml.etree.SubElement(tbl, 'tr')
             width_pct = round(100.0 / len(col_children), 2)
             for col in col_children:
-                td = lxml.html.SubElement(tr, 'td')
+                td = lxml.etree.SubElement(tr, 'td')
                 td_class = col.get('class') or ''
                 td.set('class', td_class)
                 # Respect Bootstrap col-N / col-md-N widths when explicitly set
@@ -584,6 +627,28 @@ class IrActionsReport(models.Model):
             parent = row.getparent()
             if parent is not None:
                 parent.replace(row, tbl)
+
+        # Convert 2-column `.d-flex` header containers (e.g. web.external_layout_striped
+        # company logo + company_address) into side-by-side layout tables for xhtml2pdf.
+        for flex in doc.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " d-flex ")]'):
+            div_children = [c for c in flex if isinstance(c.tag, str)]
+            if len(div_children) != 2 or not all(c.tag == 'div' for c in div_children):
+                continue
+            tbl = lxml.html.Element('table')
+            tbl.set('class', 'o_layout_grid')
+            tr = lxml.html.SubElement(tbl, 'tr')
+            for idx, col in enumerate(div_children):
+                td = lxml.html.SubElement(tr, 'td')
+                td.set('class', col.get('class') or '')
+                pad_left = '12pt' if idx == 1 else '0'
+                td.set('style', f'width: 50%; vertical-align: top; text-align: left; padding-left: {pad_left};')
+                if col.text:
+                    td.text = col.text
+                for sub in list(col):
+                    td.append(sub)
+            parent = flex.getparent()
+            if parent is not None:
+                parent.replace(flex, tbl)
 
         body_el = doc.find('.//body')
         if body_el is not None:
@@ -694,7 +759,7 @@ class IrActionsReport(models.Model):
                 )
                 out_buf = io.BytesIO()
                 status = pisa.CreatePDF(
-                    src=io.StringIO(full_html),
+                    src=io.BytesIO(full_html.encode('utf-8')),
                     dest=out_buf,
                     encoding='utf-8',
                     link_callback=_link_callback,
@@ -718,7 +783,10 @@ class IrActionsReport(models.Model):
             return b''
         if len(pdf_chunks) == 1:
             return pdf_chunks[0]
-        from pypdf import PdfReader, PdfWriter  # noqa: PLC0415
+        try:
+            from pypdf import PdfReader, PdfWriter  # noqa: PLC0415
+        except ImportError:
+            from PyPDF2 import PdfReader, PdfWriter  # noqa: PLC0415
 
         writer = PdfWriter()
         for chunk in pdf_chunks:
