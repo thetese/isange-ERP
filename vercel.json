@@ -4,6 +4,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 300,
+      "includeFiles": "addons/**/public/**",
       "excludeFiles": "{doc/**,debian/**,setup/**,**/tests/**,**/*.po,addons/spreadsheet*/**,addons/website_slides*/**,addons/website_blog/**,addons/website_event*/**,addons/website_hr*/**,addons/mass_mailing*/**,addons/mrp*/**,addons/survey*/**,addons/project*/**}"
     }
   },
