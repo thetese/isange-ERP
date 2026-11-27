@@ -1,0 +1,550 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_isange_lease" model="ir.sequence">
+            <field name="name">Isange Tenant Lease</field>
+            <field name="code">isange.lease</field>
+            <field name="prefix">LEASE/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_isange_vehicle_trip" model="ir.sequence">
+            <field name="name">Isange Vehicle Trip</field>
+            <field name="code">isange.vehicle.trip</field>
+            <field name="prefix">TRIP/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Pre-configured Construction & Hardware Product Categories -->
+        <record id="prod_cat_cement" model="product.category">
+            <field name="name">Cement, Sand &amp; Aggregates</field>
+        </record>
+        <record id="prod_cat_steel" model="product.category">
+            <field name="name">Steel Bars, Iron Sheets &amp; Nails</field>
+        </record>
+        <record id="prod_cat_timber" model="product.category">
+            <field name="name">Timber, Wood &amp; Roofing</field>
+        </record>
+        <record id="prod_cat_plumbing" model="product.category">
+            <field name="name">Plumbing, Pipes &amp; Water Tanks</field>
+        </record>
+        <record id="prod_cat_electrical" model="product.category">
+            <field name="name">Electrical &amp; Lighting</field>
+        </record>
+        <record id="prod_cat_paint" model="product.category">
+            <field name="name">Paint, Tiles &amp; Finishing</field>
+        </record>
+        <record id="prod_cat_tools" model="product.category">
+            <field name="name">Tools, Locks &amp; General Hardware</field>
+        </record>
+
+        <!-- Standard Fleet Maintenance & Repair Service Categories -->
+        <record id="fleet_svc_oil_filter" model="fleet.service.type">
+            <field name="name">Oil &amp; Filter Service</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_tires" model="fleet.service.type">
+            <field name="name">Tires &amp; Wheel Alignment</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_brakes" model="fleet.service.type">
+            <field name="name">Brakes &amp; Suspension</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_engine" model="fleet.service.type">
+            <field name="name">Engine &amp; Gearbox Repair</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_battery" model="fleet.service.type">
+            <field name="name">Battery &amp; Electrical</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_inspection" model="fleet.service.type">
+            <field name="name">Controle Technique &amp; Insurance</field>
+            <field name="category">service</field>
+        </record>
+        <record id="fleet_svc_general" model="fleet.service.type">
+            <field name="name">General Garage Repair</field>
+            <field name="category">service</field>
+        </record>
+    </data>
+
+    <!-- Starter Business Data, Official Company Details, Bank Accounts & Commercial Units -->
+    <data noupdate="0">
+
+        <!-- 0. Activate RWF & USD Currencies, Rwanda TIN Label & Balanced A4 Paperformat -->
+        <record id="base.RWF" model="res.currency">
+            <field name="active" eval="True"/>
+        </record>
+        <record id="base.USD" model="res.currency">
+            <field name="active" eval="True"/>
+        </record>
+        <record id="base.rw" model="res.country">
+            <field name="vat_label">TIN</field>
+        </record>
+        <record id="base.paperformat_euro" model="report.paperformat">
+            <field name="margin_top">40</field>
+            <field name="header_spacing">36</field>
+            <field name="margin_bottom">44</field>
+            <field name="margin_left">10</field>
+            <field name="margin_right">10</field>
+        </record>
+
+        <!-- 1. Official Isange Hardware Ltd Company Profile & Document Layout Settings -->
+        <record id="base.main_company" model="res.company">
+            <field name="name">Isange Hardware Ltd</field>
+            <field name="street">Gisozi, Gasabo District</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="vat">109047885</field>
+            <field name="phone">+250 794 766 952</field>
+            <field name="email">isangehardware@gmail.com</field>
+            <field name="logo">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</field>
+            <field name="primary_color">#002266</field>
+            <field name="secondary_color">#E30613</field>
+            <field name="paperformat_id" ref="base.paperformat_euro"/>
+            <field name="external_report_layout_id" ref="web.external_layout_striped"/>
+            <field name="company_details" type="html"><div><strong>Isange Hardware Ltd</strong><br/>Gisozi, Gasabo District, Kigali, Rwanda<br/>Tel: +250 794 766 952 · isangehardware@gmail.com</div></field>
+            <field name="report_header" eval="False"/>
+            <field name="report_footer" type="html"><span>Isange Hardware Ltd · Gisozi, Gasabo District, Kigali, Rwanda · Tel: +250 794 766 952 · TIN: 109047885</span></field>
+        </record>
+
+        <!-- 1B. Official Rwandan Banks & 6 Verified Isange Hardware Ltd Accounts -->
+        <record id="bank_mtn_momo_rw" model="res.bank">
+            <field name="name">MTN MoMo Rwanda</field>
+            <field name="bic">MTNMRWRW</field>
+            <field name="country" ref="base.rw"/>
+        </record>
+        <record id="bank_bk_rw" model="res.bank">
+            <field name="name">Bank of Kigali (BK)</field>
+            <field name="bic">BKRWRWRW</field>
+            <field name="country" ref="base.rw"/>
+        </record>
+        <record id="bank_equity_rw" model="res.bank">
+            <field name="name">Equity Bank Rwanda</field>
+            <field name="bic">EQBLRWRW</field>
+            <field name="country" ref="base.rw"/>
+        </record>
+        <record id="bank_bpr_rw" model="res.bank">
+            <field name="name">BPR Bank Rwanda</field>
+            <field name="bic">BPRWRWRW</field>
+            <field name="country" ref="base.rw"/>
+        </record>
+        <record id="bank_ncba_rw" model="res.bank">
+            <field name="name">NCBA Bank Rwanda</field>
+            <field name="bic">NCBARWRW</field>
+            <field name="country" ref="base.rw"/>
+        </record>
+
+        <record id="company_acc_momo_rwf" model="res.partner.bank">
+            <field name="acc_number">0794766952</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_mtn_momo_rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+        <record id="company_acc_bk_rwf" model="res.partner.bank">
+            <field name="acc_number">100090240131</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_bk_rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+        <record id="company_acc_equity_usd" model="res.partner.bank">
+            <field name="acc_number">4014201237394</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_equity_rw"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+        <record id="company_acc_equity_rwf" model="res.partner.bank">
+            <field name="acc_number">4014200800883</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_equity_rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+        <record id="company_acc_bpr_rwf" model="res.partner.bank">
+            <field name="acc_number">4491902127</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_bpr_rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+        <record id="company_acc_ncba_rwf" model="res.partner.bank">
+            <field name="acc_number">2001161170002223</field>
+            <field name="partner_id" ref="base.main_partner"/>
+            <field name="bank_id" ref="bank_ncba_rw"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="acc_holder_name">ISANGE HARDWARE LTD</field>
+            <field name="allow_out_payment" eval="True"/>
+        </record>
+
+        <!-- 2. Starter Contacts (Walk-in Cashier, Commercial Tenant, Construction Customer, Supplier, Driver) -->
+        <record id="partner_walkin_cashier" model="res.partner">
+            <field name="name">Walk-in Customer (Cash Sale)</field>
+            <field name="phone">+250 794 766 952</field>
+            <field name="street">Gisozi Counter</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+        </record>
+
+        <record id="partner_tenant_jp" model="res.partner">
+            <field name="name">Jean Paul Habimana (Corner Showroom Tenant)</field>
+            <field name="phone">+250 788 111 222</field>
+            <field name="email">jphabimana@example.com</field>
+            <field name="street">Isange Commercial Building — Unit G-01</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+        </record>
+
+        <record id="partner_customer_builders" model="res.partner">
+            <field name="name">Kigali Builders Ltd</field>
+            <field name="is_company" eval="True"/>
+            <field name="phone">+250 788 333 444</field>
+            <field name="street">Kimironko Industrial Zone</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+        </record>
+
+        <record id="partner_vendor_supplies" model="res.partner">
+            <field name="name">East Africa Building Supplies</field>
+            <field name="is_company" eval="True"/>
+            <field name="phone">+250 788 555 666</field>
+            <field name="street">Gikondo Warehouse Park</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+        </record>
+
+        <record id="partner_driver_eric" model="res.partner">
+            <field name="name">Eric Ndayisaba (Driver)</field>
+            <field name="phone">+250 788 777 888</field>
+            <field name="street">Remera</field>
+            <field name="city">Kigali</field>
+            <field name="country_id" ref="base.rw"/>
+        </record>
+
+        <!-- 3. Real Storable Construction & Hardware Products (Sales, Purchase, Inventory & POS) -->
+        <record id="prod_cement_50kg" model="product.template">
+            <field name="name">CEMENTS Nyarwanda (50Kg)</field>
+            <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">12500</field>
+            <field name="standard_price">10800</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">cement_aggregates</field>
+            <field name="unit_weight_kg">50.0</field>
+            <field name="bulk_pack_qty">20.0</field>
+        </record>
+
+        <record id="prod_iron_sheet_28g" model="product.template">
+            <field name="name">CEMENT TWIGA (50Kg)</field>
+            <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">13000</field>
+            <field name="standard_price">11200</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">cement_aggregates</field>
+            <field name="unit_weight_kg">50.0</field>
+            <field name="bulk_pack_qty">20.0</field>
+        </record>
+
+        <record id="prod_cement_white" model="product.template">
+            <field name="name">CEMENT WHITE (50Kg)</field>
+            <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">18500</field>
+            <field name="standard_price">15500</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">cement_aggregates</field>
+            <field name="unit_weight_kg">50.0</field>
+            <field name="bulk_pack_qty">20.0</field>
+        </record>
+
+        <record id="prod_steel_bar_t12" model="product.template">
+            <field name="name">GYPSUM BOARDS 15 BY 9</field>
+            <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">11000</field>
+            <field name="standard_price">9000</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">paint_finishing</field>
+            <field name="unit_weight_kg">14.0</field>
+            <field name="bulk_pack_qty">10.0</field>
+        </record>
+
+        <record id="prod_nails_4inch" model="product.template">
+            <field name="name">PLASTA ANDIKA 15 BY 9</field>
+            <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">12000</field>
+            <field name="standard_price">9500</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">paint_finishing</field>
+            <field name="unit_weight_kg">25.0</field>
+            <field name="bulk_pack_qty">20.0</field>
+        </record>
+
+        <record id="prod_pvc_pipe_110" model="product.template">
+            <field name="name">COMPOUND 21 BY 9</field>
+            <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">18000</field>
+            <field name="standard_price">14500</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">paint_finishing</field>
+            <field name="unit_weight_kg">30.0</field>
+            <field name="bulk_pack_qty">10.0</field>
+        </record>
+
+        <record id="prod_paint_20l" model="product.template">
+            <field name="name">VICE 15 BY 9</field>
+            <field name="categ_id" ref="prod_cat_steel"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">5000</field>
+            <field name="standard_price">3800</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">steel_iron</field>
+            <field name="unit_weight_kg">1.0</field>
+            <field name="bulk_pack_qty">10.0</field>
+        </record>
+
+        <record id="prod_timber_4x2" model="product.template">
+            <field name="name">UDUTIMBA 15 BY 9</field>
+            <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">3500</field>
+            <field name="standard_price">2500</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">paint_finishing</field>
+            <field name="unit_weight_kg">0.5</field>
+            <field name="bulk_pack_qty">10.0</field>
+        </record>
+
+        <record id="prod_wheelbarrow" model="product.template">
+            <field name="name">CORNER TAPE 15 BY 9</field>
+            <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">4000</field>
+            <field name="standard_price">2800</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">paint_finishing</field>
+            <field name="unit_weight_kg">0.5</field>
+            <field name="bulk_pack_qty">10.0</field>
+            <field name="description_sale">Measurement not specified (Ntabyanditseho)</field>
+        </record>
+
+        <record id="prod_ibiti" model="product.template">
+            <field name="name">IBITI (Timber Poles)</field>
+            <field name="categ_id" ref="prod_cat_timber"/>
+            <field name="type">consu</field>
+            <field name="is_storable" eval="True"/>
+            <field name="list_price">3000</field>
+            <field name="standard_price">2200</field>
+            <field name="available_in_pos" eval="True"/>
+            <field name="is_construction_item" eval="True"/>
+            <field name="construction_category">timber_roofing</field>
+            <field name="unit_weight_kg">8.0</field>
+            <field name="bulk_pack_qty">50.0</field>
+        </record>
+
+        <!-- 4. Commercial Building Units Across Floors -->
+        <record id="prop_kicukiro_villa" model="isange.property">
+            <field name="name">Shop G-01 (Main Corner Showroom)</field>
+            <field name="code">G-01</field>
+            <field name="property_type">commercial</field>
+            <field name="state">occupied</field>
+            <field name="neighborhood">Ground Floor</field>
+            <field name="street">Isange Commercial Building, Gisozi</field>
+            <field name="city">Kigali</field>
+            <field name="bedrooms">0</field>
+            <field name="bathrooms">1</field>
+            <field name="area_sqm">85</field>
+            <field name="furnished" eval="True"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="monthly_rent">450000</field>
+            <field name="security_deposit">450000</field>
+            <field name="current_tenant_id" ref="partner_tenant_jp"/>
+            <field name="notes">Ground floor street-facing corner retail showroom with dedicated CASHPOWER sub-meter.</field>
+        </record>
+
+        <record id="prop_remera_apt" model="isange.property">
+            <field name="name">Shop G-02 (Retail Unit)</field>
+            <field name="code">G-02</field>
+            <field name="property_type">commercial</field>
+            <field name="state">vacant</field>
+            <field name="neighborhood">Ground Floor</field>
+            <field name="street">Isange Commercial Building, Gisozi</field>
+            <field name="city">Kigali</field>
+            <field name="bedrooms">0</field>
+            <field name="bathrooms">1</field>
+            <field name="area_sqm">50</field>
+            <field name="furnished" eval="False"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="monthly_rent">350000</field>
+            <field name="security_deposit">350000</field>
+            <field name="notes">Ground floor retail shop with glass storefront and roll-up security shutter.</field>
+        </record>
+
+        <record id="prop_gisozi_shop" model="isange.property">
+            <field name="name">Office Suite 101 (1st Floor Wing A)</field>
+            <field name="code">101</field>
+            <field name="property_type">commercial</field>
+            <field name="state">vacant</field>
+            <field name="neighborhood">1st Floor</field>
+            <field name="street">Isange Commercial Building, Gisozi</field>
+            <field name="city">Kigali</field>
+            <field name="bedrooms">0</field>
+            <field name="bathrooms">1</field>
+            <field name="area_sqm">65</field>
+            <field name="furnished" eval="True"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="monthly_rent">300000</field>
+            <field name="security_deposit">300000</field>
+            <field name="notes">1st floor commercial office suite with glass partitions and fiber internet readiness.</field>
+        </record>
+
+        <record id="prop_office_201" model="isange.property">
+            <field name="name">Office Suite 201 (2nd Floor Wing A)</field>
+            <field name="code">201</field>
+            <field name="property_type">commercial</field>
+            <field name="state">vacant</field>
+            <field name="neighborhood">2nd Floor</field>
+            <field name="street">Isange Commercial Building, Gisozi</field>
+            <field name="city">Kigali</field>
+            <field name="bedrooms">0</field>
+            <field name="bathrooms">1</field>
+            <field name="area_sqm">65</field>
+            <field name="furnished" eval="False"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="monthly_rent">280000</field>
+            <field name="security_deposit">280000</field>
+            <field name="notes">2nd floor open-plan commercial office unit.</field>
+        </record>
+
+        <record id="prop_basement_store" model="isange.property">
+            <field name="name">Warehouse &amp; Storage Unit B-01</field>
+            <field name="code">B-01</field>
+            <field name="property_type">warehouse</field>
+            <field name="state">vacant</field>
+            <field name="neighborhood">Basement / Rear Loading Bay</field>
+            <field name="street">Isange Commercial Building, Gisozi</field>
+            <field name="city">Kigali</field>
+            <field name="bedrooms">0</field>
+            <field name="bathrooms">0</field>
+            <field name="area_sqm">140</field>
+            <field name="furnished" eval="False"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="monthly_rent">400000</field>
+            <field name="security_deposit">400000</field>
+            <field name="notes">Large storage &amp; wholesale depot space with direct truck loading access.</field>
+        </record>
+
+        <!-- 5. Active Commercial Lease & Building Maintenance Expense -->
+        <record id="lease_kicukiro_villa" model="isange.lease">
+            <field name="name">LEASE/2026/0001</field>
+            <field name="property_id" ref="prop_kicukiro_villa"/>
+            <field name="tenant_id" ref="partner_tenant_jp"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="billing_cycle">monthly</field>
+            <field name="rent_amount">450000</field>
+            <field name="deposit_amount">450000</field>
+            <field name="deposit_paid" eval="True"/>
+            <field name="state">active</field>
+            <field name="terms">Commercial shop rent payable before the 5th of each month via MTN MoMo or Bank Transfer.</field>
+        </record>
+
+        <record id="expense_kicukiro_plumbing" model="isange.property.expense">
+            <field name="name">Commercial Building Electrical &amp; Lighting Maintenance</field>
+            <field name="property_id" ref="prop_kicukiro_villa"/>
+            <field name="expense_type">repair</field>
+            <field name="vendor_id" ref="partner_vendor_supplies"/>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="amount">35000</field>
+            <field name="state">approved</field>
+            <field name="notes">Serviced storefront breaker panel and LED lighting in Shop G-01.</field>
+        </record>
+
+        <!-- 6. Company Fleet Vehicles & Delivery Trip -->
+        <record id="fleet_brand_isuzu" model="fleet.vehicle.model.brand">
+            <field name="name">Isuzu</field>
+        </record>
+
+        <record id="fleet_brand_toyota" model="fleet.vehicle.model.brand">
+            <field name="name">Toyota</field>
+        </record>
+
+        <record id="fleet_model_isuzu_fvr" model="fleet.vehicle.model">
+            <field name="name">FVR 10-Ton Construction Truck</field>
+            <field name="brand_id" ref="fleet_brand_isuzu"/>
+            <field name="vehicle_type">car</field>
+        </record>
+
+        <record id="fleet_model_toyota_hilux" model="fleet.vehicle.model">
+            <field name="name">Hilux Double Cab Pickup</field>
+            <field name="brand_id" ref="fleet_brand_toyota"/>
+            <field name="vehicle_type">car</field>
+        </record>
+
+        <record id="vehicle_isuzu_truck" model="fleet.vehicle">
+            <field name="model_id" ref="fleet_model_isuzu_fvr"/>
+            <field name="license_plate">RAE 820 C</field>
+            <field name="driver_id" ref="partner_driver_eric"/>
+            <field name="odometer">78200</field>
+        </record>
+
+        <record id="vehicle_toyota_pickup" model="fleet.vehicle">
+            <field name="model_id" ref="fleet_model_toyota_hilux"/>
+            <field name="license_plate">RAD 450 B</field>
+            <field name="driver_id" ref="partner_driver_eric"/>
+            <field name="odometer">42500</field>
+        </record>
+
+        <record id="trip_kimironko_delivery" model="isange.vehicle.trip">
+            <field name="name">TRIP/2026/0001</field>
+            <field name="vehicle_id" ref="vehicle_isuzu_truck"/>
+            <field name="driver_id" ref="partner_driver_eric"/>
+            <field name="trip_type">delivery</field>
+            <field name="partner_id" ref="partner_customer_builders"/>
+            <field name="origin_location">Isange Hardware Store, Gisozi</field>
+            <field name="destination_location">Kimironko Construction Site</field>
+            <field name="cargo_description">100x CEMENTS Nyarwanda (50Kg), 50x GYPSUM BOARDS 15 BY 9</field>
+            <field name="odometer_start">78160</field>
+            <field name="odometer_end">78200</field>
+            <field name="currency_id" ref="base.RWF"/>
+            <field name="fuel_liters">15</field>
+            <field name="fuel_cost">27000</field>
+            <field name="other_cost">5000</field>
+            <field name="delivery_fee">50000</field>
+            <field name="state">completed</field>
+            <field name="notes">Delivered full load on schedule; offloading fee 5,000 RWF.</field>
+        </record>
+
+    </data>
+</odoo>

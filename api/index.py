@@ -415,7 +415,7 @@ def _handle_init_db(environ: dict, start_response):
             m.strip()
             for m in (
                 os.environ.get('ODOO_DEFAULT_MODULES')
-                or 'base,web,contacts,sale_management,account,vercel_supabase'
+                or 'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,vercel_supabase'
             ).split(',')
             if m.strip()
         ]
@@ -434,6 +434,26 @@ def _handle_init_db(environ: dict, start_response):
         with db.cursor() as cr:
             cr.execute("SELECT to_regclass('public.ir_module_module')")
             already_initialized = cr.fetchone()[0] is not None
+            if already_initialized:
+                from odoo.modules.module import Manifest, initialize_sys_path  # noqa: PLC0415
+                initialize_sys_path()
+                cr.execute(
+                    "SELECT id, name, state, auto_install FROM public.ir_module_module "
+                    "WHERE state IN ('uninstalled', 'to install')"
+                )
+                missing_ids = [
+                    row[0] for row in cr.fetchall()
+                    if (row[2] == 'to install' or row[3])
+                    and Manifest.for_addon(row[1], display_warning=False) is None
+                ]
+                if missing_ids:
+                    cr.execute(
+                        "UPDATE public.ir_module_module "
+                        "SET state = 'uninstalled', auto_install = false "
+                        "WHERE id = ANY(%s)",
+                        (missing_ids,),
+                    )
+                    cr.commit()
 
         if action == 'upgrade':
             install_mods = ()

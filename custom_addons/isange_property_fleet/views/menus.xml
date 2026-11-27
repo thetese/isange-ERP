@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Root App 0: COMMAND CENTER (First App on Home Menu!) -->
+    <menuitem id="menu_isange_command_root"
+        name="Command Center"
+        action="action_isange_command_center"
+        sequence="0"
+        web_icon="isange_property_fleet,static/description/icon_command.svg"/>
+
+    <!-- Root App: Rentals & Trips -->
+    <menuitem id="menu_isange_root"
+        name="Rentals &amp; Trips"
+        sequence="5"
+        web_icon="isange_property_fleet,static/description/icon.svg"/>
+
+    <!-- Top-bar direct tabs inside Rentals & Trips -->
+    <menuitem id="menu_isange_dashboard_tab"
+        name="0. Command Center"
+        parent="menu_isange_root"
+        action="action_isange_command_center"
+        sequence="5"/>
+
+    <menuitem id="menu_isange_fast_sale_tab"
+        name="Quick Sale"
+        parent="menu_isange_root"
+        action="action_isange_fast_sale"
+        sequence="7"/>
+
+    <menuitem id="menu_isange_stock_manager_tab"
+        name="Stock Manager"
+        parent="menu_isange_root"
+        action="action_isange_stock_manager"
+        sequence="8"/>
+
+    <menuitem id="menu_isange_fleet_manager_tab"
+        name="Vehicle Manager"
+        parent="menu_isange_root"
+        action="action_isange_fleet_manager"
+        sequence="9"/>
+
+    <menuitem id="menu_sale_isange_fast_sale"
+        name="Quick Sale"
+        parent="sale.sale_menu_root"
+        action="action_isange_fast_sale"
+        sequence="1"/>
+
+    <menuitem id="menu_isange_property"
+        name="1. Building Units &amp; Shops"
+        parent="menu_isange_root"
+        action="action_isange_property"
+        sequence="10"/>
+
+    <menuitem id="menu_isange_lease"
+        name="2. Tenant Leases &amp; Rent"
+        parent="menu_isange_root"
+        action="action_isange_lease"
+        sequence="20"/>
+
+    <menuitem id="menu_isange_property_expense"
+        name="3. Building Repairs &amp; Costs"
+        parent="menu_isange_root"
+        action="action_isange_property_expense"
+        sequence="30"/>
+
+    <menuitem id="menu_isange_vehicle_trip"
+        name="4. Vehicle Delivery Trips"
+        parent="menu_isange_root"
+        action="action_isange_vehicle_trip"
+        sequence="40"/>
+
+    <!-- 5. ALL-IN-ONE REPORTS HUB (Unites all 3 Business Lines in 1 Menu!) -->
+    <menuitem id="menu_isange_all_reports"
+        name="5. All-in-One Reports"
+        parent="menu_isange_root"
+        sequence="50"/>
+
+    <menuitem id="menu_report_isange_property_profit"
+        name="1. Commercial Building Units &amp; Profit"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_property_profit"
+        sequence="10"/>
+
+    <menuitem id="menu_report_isange_lease"
+        name="2. Commercial Leases &amp; Rent Roll"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_lease"
+        sequence="20"/>
+
+    <menuitem id="menu_report_isange_property_expense"
+        name="3. Building Repairs &amp; Expenses"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_property_expense"
+        sequence="30"/>
+
+    <menuitem id="menu_report_isange_vehicle_trip"
+        name="4. Vehicle Trips &amp; Fuel Costs"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_vehicle_trip"
+        sequence="40"/>
+
+    <menuitem id="menu_report_isange_sales"
+        name="5. Construction &amp; Hardware Sales"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_sales"
+        sequence="50"/>
+
+    <menuitem id="menu_report_isange_purchases"
+        name="6. Supplier Material Purchases"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_purchases"
+        sequence="60"/>
+
+    <menuitem id="menu_report_isange_invoices"
+        name="7. All Company Invoices &amp; Bills"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_invoices"
+        sequence="70"/>
+
+    <menuitem id="menu_report_isange_fleet_services"
+        name="8. Vehicle Maintenance &amp; Repairs"
+        parent="menu_isange_all_reports"
+        action="action_report_isange_fleet_services"
+        sequence="80"/>
+
+    <!-- Also link Vehicle Manager & Delivery Trips directly inside the Fleet app menu -->
+    <menuitem id="menu_fleet_isange_fleet_manager"
+        name="Vehicle Manager"
+        parent="fleet.menu_root"
+        action="action_isange_fleet_manager"
+        sequence="1"/>
+
+    <menuitem id="menu_fleet_isange_vehicle_trip"
+        name="Delivery &amp; Operation Trips"
+        parent="fleet.menu_root"
+        action="action_isange_vehicle_trip"
+        sequence="5"/>
+
+    <!-- Hide Link Tracker from the Home Menu so the screen is 100% clean -->
+    <record id="utm.menu_link_tracker_root" model="ir.ui.menu">
+        <field name="active" eval="False"/>
+    </record>
+
+    <!-- Organize Home Menu App Order for Maximum Ease of Use -->
+    <record id="point_of_sale.menu_point_root" model="ir.ui.menu">
+        <field name="sequence">1</field>
+    </record>
+    <record id="sale.sale_menu_root" model="ir.ui.menu">
+        <field name="sequence">2</field>
+    </record>
+    <record id="stock.menu_stock_root" model="ir.ui.menu">
+        <field name="sequence">3</field>
+    </record>
+    <record id="purchase.menu_purchase_root" model="ir.ui.menu">
+        <field name="sequence">4</field>
+    </record>
+    <record id="fleet.menu_root" model="ir.ui.menu">
+        <field name="sequence">6</field>
+    </record>
+    <record id="account.menu_finance" model="ir.ui.menu">
+        <field name="sequence">7</field>
+    </record>
+    <record id="contacts.menu_contacts" model="ir.ui.menu">
+        <field name="sequence">8</field>
+    </record>
+    <record id="maintenance.menu_maintenance_title" model="ir.ui.menu">
+        <field name="sequence">9</field>
+    </record>
+    <record id="hr_expense.menu_hr_expense_root" model="ir.ui.menu">
+        <field name="sequence">10</field>
+    </record>
+    <record id="hr.menu_hr_root" model="ir.ui.menu">
+        <field name="sequence">11</field>
+    </record>
+    <record id="mail.menu_root_discuss" model="ir.ui.menu">
+        <field name="sequence">12</field>
+    </record>
+
+</odoo>

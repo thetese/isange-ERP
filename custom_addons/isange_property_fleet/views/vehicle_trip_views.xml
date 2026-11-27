@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Quick-Create Window Action for 1-Click Dispatch from Sales Order -->
+    <record id="action_isange_quick_dispatch_trip" model="ir.actions.act_window">
+        <field name="name">Dispatch Delivery Vehicle</field>
+        <field name="res_model">isange.vehicle.trip</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{
+            'default_trip_type': 'delivery',
+            'default_sale_order_id': active_id,
+        }</field>
+    </record>
+
+    <!-- Printable PDF Report 3: Vehicle Delivery Trip & Fuel Sheet -->
+    <record id="action_report_vehicle_trip_pdf" model="ir.actions.report">
+        <field name="name">Vehicle Delivery Trip &amp; Fuel Sheet (PDF)</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">isange_property_fleet.report_vehicle_trip_document</field>
+        <field name="report_file">isange_property_fleet.report_vehicle_trip_document</field>
+        <field name="binding_model_id" ref="model_isange_vehicle_trip"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_vehicle_trip_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Vehicle Delivery &amp; Operation Sheet: <span t-field="doc.name"/></h2>
+                        <div class="row mt-4 mb-4">
+                            <div class="col-6">
+                                <strong>Vehicle:</strong> <span t-field="doc.vehicle_id.name"/><br/>
+                                <strong>Driver:</strong> <span t-field="doc.driver_id.name"/><br/>
+                                <strong>Operation Type:</strong> <span t-field="doc.trip_type"/><br/>
+                                <strong>Customer / Partner:</strong> <span t-field="doc.partner_id.name"/><br/>
+                                <strong>Linked Sales Order:</strong> <span t-field="doc.sale_order_id.name"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Departure:</strong> <span t-field="doc.date"/><br/>
+                                <strong>Return:</strong> <span t-field="doc.date_arrival"/><br/>
+                                <strong>From:</strong> <span t-field="doc.origin_location"/><br/>
+                                <strong>To (Destination):</strong> <span t-field="doc.destination_location"/><br/>
+                                <strong>Cargo / Items:</strong> <span t-field="doc.cargo_description"/>
+                            </div>
+                        </div>
+                        <table class="table table-sm table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Start Odometer</th>
+                                    <th>End Odometer</th>
+                                    <th>Distance (km)</th>
+                                    <th>Fuel (Liters)</th>
+                                    <th class="text-end">Fuel Cost</th>
+                                    <th class="text-end">Other Cost</th>
+                                    <th class="text-end">Total Cost</th>
+                                    <th class="text-end">Delivery Fee</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span t-field="doc.odometer_start"/></td>
+                                    <td><span t-field="doc.odometer_end"/></td>
+                                    <td><span t-field="doc.distance_km"/></td>
+                                    <td><span t-field="doc.fuel_liters"/></td>
+                                    <td class="text-end"><span t-field="doc.fuel_cost"/></td>
+                                    <td class="text-end"><span t-field="doc.other_cost"/></td>
+                                    <td class="text-end"><strong><span t-field="doc.total_cost"/></strong></td>
+                                    <td class="text-end"><span t-field="doc.delivery_fee"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="isange_vehicle_trip_view_form" model="ir.ui.view">
+        <field name="name">isange.vehicle.trip.form</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="arch" type="xml">
+            <form string="Vehicle Delivery &amp; Operation Log">
+                <header>
+                    <button name="action_start_trip" string="1. Start Trip (On the Road)" type="object"
+                        class="btn-primary" invisible="state != 'planned'"/>
+                    <button name="action_complete_trip" string="2. Mark Trip Completed" type="object"
+                        class="btn-primary" invisible="state not in ('planned', 'in_transit')"/>
+                    <button name="%(action_report_vehicle_trip_pdf)d" string="Print Trip Sheet (PDF)" type="action"
+                        class="btn-secondary"/>
+                    <button name="action_cancel_trip" string="Cancel" type="object"
+                        class="btn-secondary" invisible="state in ('completed', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="planned,in_transit,completed"/>
+                </header>
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="1. Vehicle, Driver &amp; Route">
+                            <field name="vehicle_id"/>
+                            <field name="driver_id"/>
+                            <field name="trip_type"/>
+                            <field name="origin_location"/>
+                            <field name="destination_location" placeholder="e.g. Kimironko Site / Customer Address"/>
+                            <field name="cargo_description" placeholder="e.g. 50 bags of cement, 20 iron sheets"/>
+                        </group>
+                        <group string="2. Schedule &amp; Customer Order">
+                            <field name="date"/>
+                            <field name="date_arrival"/>
+                            <field name="sale_order_id"/>
+                            <field name="partner_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="3. Odometer &amp; Distance (Auto-Updates Vehicle)">
+                            <field name="odometer_start"/>
+                            <field name="odometer_end"/>
+                            <field name="distance_km"/>
+                        </group>
+                        <group string="4. Fuel &amp; Trip Costs">
+                            <field name="fuel_liters"/>
+                            <field name="fuel_cost"/>
+                            <field name="other_cost"/>
+                            <field name="total_cost"/>
+                            <field name="delivery_fee"/>
+                        </group>
+                    </group>
+                    <field name="notes" placeholder="Notes on delivery, fuel station receipt, or road conditions..."/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="isange_vehicle_trip_view_list" model="ir.ui.view">
+        <field name="name">isange.vehicle.trip.list</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="arch" type="xml">
+            <list string="Vehicle Delivery &amp; Operation Logs" sample="1">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+                <field name="trip_type"/>
+                <field name="destination_location"/>
+                <field name="cargo_description" optional="show"/>
+                <field name="partner_id" optional="show"/>
+                <field name="distance_km" sum="Total Distance (km)" optional="show"/>
+                <field name="fuel_cost" sum="Total Fuel Cost"/>
+                <field name="total_cost" sum="Total Trip Cost"/>
+                <field name="delivery_fee" sum="Total Delivery Fees" optional="show"/>
+                <field name="state" widget="badge"
+                    decoration-success="state == 'completed'"
+                    decoration-warning="state == 'in_transit'"
+                    decoration-info="state == 'planned'"
+                    decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="isange_vehicle_trip_view_pivot" model="ir.ui.view">
+        <field name="name">isange.vehicle.trip.pivot</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="arch" type="xml">
+            <pivot string="Vehicle Trips, Fuel &amp; Cost Analysis" sample="1">
+                <field name="vehicle_id" type="row"/>
+                <field name="driver_id" type="row"/>
+                <field name="trip_type" type="col"/>
+                <field name="distance_km" type="measure"/>
+                <field name="fuel_liters" type="measure"/>
+                <field name="fuel_cost" type="measure"/>
+                <field name="total_cost" type="measure"/>
+                <field name="delivery_fee" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="isange_vehicle_trip_view_graph" model="ir.ui.view">
+        <field name="name">isange.vehicle.trip.graph</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="arch" type="xml">
+            <graph string="Vehicle Trips, Fuel &amp; Cost Analysis" type="bar" sample="1">
+                <field name="vehicle_id"/>
+                <field name="total_cost" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="isange_vehicle_trip_view_search" model="ir.ui.view">
+        <field name="name">isange.vehicle.trip.search</field>
+        <field name="model">isange.vehicle.trip</field>
+        <field name="arch" type="xml">
+            <search string="Search Vehicle Trips">
+                <field name="name"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+                <field name="destination_location"/>
+                <field name="partner_id"/>
+                <filter string="Planned" name="filter_planned" domain="[('state', '=', 'planned')]"/>
+                <filter string="On the Road" name="filter_in_transit" domain="[('state', '=', 'in_transit')]"/>
+                <filter string="Completed" name="filter_completed" domain="[('state', '=', 'completed')]"/>
+                <group>
+                    <filter string="Vehicle" name="group_vehicle" context="{'group_by': 'vehicle_id'}"/>
+                    <filter string="Driver" name="group_driver" context="{'group_by': 'driver_id'}"/>
+                    <filter string="Operation Type" name="group_type" context="{'group_by': 'trip_type'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_isange_vehicle_trip" model="ir.actions.act_window">
+        <field name="name">4. Vehicle Delivery Trips</field>
+        <field name="res_model">isange.vehicle.trip</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Log a Construction Delivery or Vehicle Trip
+            </p>
+            <p>
+                <strong>How it works:</strong><br/>
+                1. Pick the <strong>Vehicle</strong>, <strong>Driver</strong>, and <strong>Destination</strong> (or click <em>Dispatch Vehicle Delivery</em> directly from a Sales Order).<br/>
+                2. Enter fuel added and costs.<br/>
+                3. Click <strong>2. Mark Trip Completed</strong> to automatically update the vehicle's odometer!
+            </p>
+        </field>
+    </record>
+
+    <record id="action_report_isange_vehicle_trip" model="ir.actions.act_window">
+        <field name="name">4. Vehicle Operations, Fuel &amp; Trips Report</field>
+        <field name="res_model">isange.vehicle.trip</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+    </record>
+
+    <!-- Smart Button on Fleet Vehicle Form -->
+    <record id="fleet_vehicle_view_form_inherit_isange" model="ir.ui.view">
+        <field name="name">fleet.vehicle.form.inherit.isange</field>
+        <field name="model">fleet.vehicle</field>
+        <field name="inherit_id" ref="fleet.fleet_vehicle_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_isange_trips" type="object" class="oe_stat_button" icon="fa-truck">
+                    <field name="isange_trip_count" widget="statinfo" string="Delivery Trips"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 1-Click Print Pro-Forma Invoice (using Odoo Document Layout) & Dispatch Vehicle Delivery Buttons on Sales Order Form -->
+    <record id="sale_order_view_form_inherit_isange" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.isange.trip</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="%(sale.action_report_pro_forma_invoice)d"
+                    string="Print Pro-Forma Invoice (PDF)"
+                    type="action"
+                    class="btn-primary"/>
+                <button name="%(action_isange_quick_dispatch_trip)d"
+                    string="Dispatch Vehicle Delivery"
+                    type="action"
+                    class="btn-secondary"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

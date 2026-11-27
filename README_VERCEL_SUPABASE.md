@@ -14,6 +14,7 @@ Standard Odoo 19 assumes a persistent local disk, long-running daemon processes,
 | **PostgreSQL Session Store** | `custom_addons/vercel_supabase/session_store.py` | Replaces Odoo 19's `FilesystemSessionStore` with `SupabasePostgresSessionStore` backed by `public.odoo_vercel_sessions` in Supabase PostgreSQL (full Odoo 19 soft/hard rotation, device-log identifier tracking, and vacuuming). |
 | **Supabase Storage / DB Filestore** | `custom_addons/vercel_supabase/models/ir_attachment.py` | Overrides `ir.attachment` (`_storage`, `_file_write`, `_file_read`, `_file_delete`, `_gc_file_store`, and `_to_http_stream`) to persist attachments & compiled JS/CSS assets in **Supabase Storage** (with `/tmp` read-through caching on warm Fluid Compute instances) or directly in **Supabase PostgreSQL** (`ODOO_FILESTORE_MODE=db`). |
 | **Serverless PDF Engine (Sales/Pro-Forma/Invoices)** | `custom_addons/vercel_supabase/models/ir_actions_report.py` | Overrides `ir.actions.report` so printing & emailing **Quotations**, **Pro-Forma Invoices**, and **Customer Invoices** generates real PDFs on Vercel without `wkhtmltopdf`: uses built-in pure-Python `xhtml2pdf` + ReportLab out of the box (with in-process logo/barcode resolution), or optional pixel-perfect Chromium/Gotenberg/Browserless via `ODOO_PDF_SERVICE_URL`. |
+| **Isange Hardware ERP Suite** | `custom_addons/isange_property_fleet/` | Custom Odoo 19 ERP module (`v19.0.2.2.0`) for **Isange Hardware Ltd** (Gisozi, Gasabo District, Kigali — TIN `109047885`): Command Center, Quick 20s Sale Terminal (Cash / MTN MoMo / Bank split settlement), 2-pane Stock & Inventory Control, 2-pane Vehicle & Fleet Control (Income, Maintenance, Travels & P&L), Commercial Building Rentals & Leases, 10 studio-photographed products, and branded Pro-Forma/Invoice PDFs with 6 official RWF/USD payment accounts in the footer. |
 | **Vercel Config & Ignore Rules** | `vercel.json`, `.vercelignore`, `.python-version` | Enables **Fluid Compute** (`fluid: true`), sets `maxDuration: 300`, routes all paths to `/api/index.py`, pins **Python 3.12**, excludes tests/docs/packaging bloat, and configures a Hobby-compatible Vercel Cron job. |
 | **Vercel Linux Dependencies** | `requirements.txt` (original saved as `requirements.odoo.txt`) | Replaces source-compiled `psycopg2` with prebuilt `psycopg2-binary`, upgrades `rjsmin` to `1.2.2` (prebuilt cp312 manylinux wheel), removes `python-ldap` (needs `libldap2-dev`), and removes Windows-only packages. |
 | **Supabase SQL Setup** | `supabase/setup.sql` | Enables `unaccent` and `pg_trgm` extensions, creates `odoo_vercel_sessions` & `odoo_vercel_filestore_gc`, creates the private `odoo-filestore` Storage bucket, and provides an optional `pg_cron` + `pg_net` snippet for every-5-minute Odoo crons even on Vercel Hobby. |
@@ -52,14 +53,14 @@ Measured sizes of this extracted Odoo 19.0 Community Edition workspace:
 - **Need non-English translations (e.g., French, Spanish, Arabic)?**
   - Either un-ignore specific `.po` files in `.vercelignore` / `vercel.json` (e.g., `!**/*/i18n/fr.po`), **OR**
   - Remove `**/*.po` from `.vercelignore` & `vercel.json` and set `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` in Vercel Environment Variables (raises Fluid Compute bundle limit to **5 GB**).
-- **Want even faster cold starts & smaller deploys for Sales + Pro-Forma + Invoicing?**
-  Use the curated `sales-invoicing` preset in `scripts/prune_addons.py` (shrinks `./addons` from 179.5 MB down to **58.4 MB** — only the 25 Sales, Pro-Forma, Invoicing, Contacts, and Portal addons + your country localization):
+- **Want even faster cold starts & smaller deploys for Isange Hardware ERP?**
+  Use the curated `isange-erp` preset in `scripts/prune_addons.py` (keeps only the exact Odoo 19 addons required by `isange_property_fleet` — Sales, Pro-Forma, Purchase, Stock, Invoicing, POS, Fleet, Maintenance, Expenses, Spreadsheet Dashboard, Contacts, and Portal + your country localization):
   ```bash
-  # Dry-run preview (replace l10n_rw with your country code, or use --l10n all)
-  python scripts/prune_addons.py --preset sales-invoicing --l10n l10n_rw --langs en --dry-run
+  # Dry-run preview (replace l10n_rw with your country code, or omit --l10n)
+  python scripts/prune_addons.py --preset isange-erp --langs en --dry-run
 
   # Apply pruning
-  python scripts/prune_addons.py --preset sales-invoicing --l10n l10n_rw --langs en --apply
+  python scripts/prune_addons.py --preset isange-erp --langs en --apply
   ```
 
 ### 3. Deploy to Vercel
@@ -88,7 +89,7 @@ Measured sizes of this extracted Odoo 19.0 Community Edition workspace:
 You have two ways to initialize the `postgres` database schema:
 
 #### Option A — Directly via Vercel (no local Python required)
-To stay comfortably inside Vercel Hobby's 300s function timeout over remote Supabase connections, run initialization in two quick steps (installs **Contacts**, **Sales**, **Pro-Forma Invoices**, and **Invoicing**, and automatically enables the `Send PRO-FORMA Invoice` action):
+To stay comfortably inside Vercel's 300s function timeout over remote Supabase connections, run initialization in three quick batches (installs the full **Isange Hardware ERP** suite and automatically enables `Send PRO-FORMA Invoice`):
 ```bash
 # Step 1: Core Odoo 19 + Vercel/Supabase adapter (~30-60s)
 curl -X POST "https://<your-project>.vercel.app/api/init-db" \
@@ -96,22 +97,28 @@ curl -X POST "https://<your-project>.vercel.app/api/init-db" \
   -H "Content-Type: application/json" \
   -d '{"modules": ["base", "web", "vercel_supabase"], "lang": "en_US", "demo": false}'
 
-# Step 2: Contacts, Sales, Pro-Forma Invoices & Invoicing (~60-150s)
+# Step 2: Contacts, Sales, Purchase, Stock & Invoicing (~60-180s)
 curl -X POST "https://<your-project>.vercel.app/api/init-db" \
   -H "Authorization: Bearer <YOUR_ODOO_INIT_SECRET>" \
   -H "Content-Type: application/json" \
-  -d '{"action": "init", "modules": ["contacts", "sale_management", "account"]}'
+  -d '{"action": "init", "modules": ["contacts", "sale_management", "purchase", "stock", "account"]}'
+
+# Step 3: POS, Fleet, Maintenance, Expenses & Isange Hardware ERP (~60-180s)
+curl -X POST "https://<your-project>.vercel.app/api/init-db" \
+  -H "Authorization: Bearer <YOUR_ODOO_INIT_SECRET>" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "init", "modules": ["point_of_sale", "fleet", "maintenance", "hr_expense", "isange_property_fleet"]}'
 ```
-*(Optional: include your country's fiscal localization in Step 2 or a 3rd call, e.g. `"l10n_rw"`, `"l10n_ke"`, `"l10n_us"`.)*
+*(Optional: include `"l10n_rw"` in a separate call if you also want Rwanda's full statutory chart of accounts.)*
 
 > **Security:** Once your database is initialized, delete `ODOO_INIT_SECRET` from Vercel Environment Variables (this automatically disables `/api/init-db`).
 
-#### Option B — From Local Machine or CI (Python 3.12)
+#### Option B — From Local Machine or CI (Python 3.12 — Recommended for One-Shot Init)
 ```bash
 pip install -r requirements.txt
 python scripts/init_supabase_db.py --admin-password "YourStrongPassword!"
 ```
-*(Installs `base,web,contacts,sale_management,account,vercel_supabase` and enables Pro-Forma Invoices automatically.)*
+*(Installs `base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,vercel_supabase`, loads Isange Hardware Ltd company/bank/product data, and enables Pro-Forma Invoices automatically.)*
 
 ### 5. Sign In & Configure Scheduled Actions (`ir.cron`)
 

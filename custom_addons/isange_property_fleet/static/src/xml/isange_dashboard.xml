@@ -1,0 +1,1961 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="isange_property_fleet.Dashboard">
+        <div class="o_action o_isange_dashboard">
+
+            <!-- ============ EXECUTIVE TOP BAR ============ -->
+            <header class="o_isg_topbar">
+                <div class="o_isg_topbar_inner">
+                    <div class="o_isg_brand_cluster">
+                        <div class="o_isg_brand_mark">IH</div>
+                        <div class="o_isg_title_block">
+                            <div class="o_isg_breadcrumb">
+                                <span>Isange Hardware</span>
+                                <span class="o_isg_crumb_sep">/</span>
+                                <span>Command Center</span>
+                                <span class="o_isg_live_badge"><i class="o_isg_live_dot"/>Live</span>
+                            </div>
+                            <div class="o_isg_title_row">
+                                <h1 class="o_isg_page_title">Operations Overview</h1>
+                                <span class="o_isg_date_label"><t t-out="state.today"/></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_toolbar">
+                        <button type="button"
+                            t-attf-class="o_isg_btn o_isg_btn_cta {{ state.fastSale.open ? 'is_active' : '' }}"
+                            t-on-click="() => this.toggleFastSale()">
+                            <i t-attf-class="fa {{ state.fastSale.open ? 'fa-times' : 'fa-plus' }} me-1"/>
+                            <t t-if="state.fastSale.open">Close Sale</t>
+                            <t t-else="">New Sale</t>
+                        </button>
+
+                        <button type="button"
+                            t-attf-class="o_isg_btn o_isg_btn_sec {{ state.stockMgr.open ? 'is_active' : '' }}"
+                            t-on-click="() => this.toggleStockManager()">
+                            <i class="fa fa-cubes me-1"/>
+                            <span>Stock Manager</span>
+                            <span t-if="state.stockMgr.lowCount + state.stockMgr.outCount &gt; 0"
+                                class="o_isg_toolbar_alert o_isg_num">
+                                <t t-out="state.stockMgr.lowCount + state.stockMgr.outCount"/>
+                            </span>
+                        </button>
+
+                        <button type="button"
+                            t-attf-class="o_isg_btn o_isg_btn_sec {{ state.fleetMgr.open ? 'is_active' : '' }}"
+                            t-on-click="() => this.toggleFleetManager()">
+                            <i class="fa fa-truck me-1"/>
+                            <span>Vehicles</span>
+                            <span t-if="state.fleetMgr.vehicles.length"
+                                class="o_isg_toolbar_badge o_isg_num">
+                                <t t-out="state.fleetMgr.vehicles.length"/>
+                            </span>
+                        </button>
+
+                        <div class="o_isg_toolbar_group">
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.openPos()" title="Open Point of Sale">
+                                <i class="fa fa-desktop me-1"/>POS
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newPurchase()" title="Create Purchase Order">
+                                <i class="fa fa-cube me-1"/>Purchase
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newLease()" title="Create Commercial Lease">
+                                <i class="fa fa-file-text-o me-1"/>New Lease
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newUnit()" title="Add Building Unit">
+                                <i class="fa fa-building-o me-1"/>Add Unit
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newTrip()" title="Dispatch Delivery Vehicle">
+                                <i class="fa fa-truck me-1"/>Dispatch
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newExpense()" title="Log Building Repair or Expense">
+                                <i class="fa fa-wrench me-1"/>Repair
+                            </button>
+                        </div>
+
+                        <div class="o_isg_toolbar_group">
+                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.printBusinessReport()" title="Export Executive Report PDF">
+                                <i class="fa fa-download me-1"/>Report PDF
+                            </button>
+                            <button type="button" class="o_isg_btn o_isg_btn_icon" t-on-click="() => this.refresh()" title="Refresh Data" aria-label="Refresh">
+                                <i t-attf-class="fa fa-refresh {{ state.loading ? 'fa-spin' : '' }}"/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="o_isg_body">
+
+                <!-- ============ EXPRESS SALE & SETTLEMENT TERMINAL ============ -->
+                <t t-if="state.fastSale.open">
+                    <section class="o_isg_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator"/>
+                                <h2>Quick Sale Terminal</h2>
+                                <span class="o_isg_terminal_meta">Instant Order, Invoicing &amp; Payment Settlement</span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.newQuotation()">
+                                    <i class="fa fa-external-link me-1"/>Standard Form
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleFastSale(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Post-sale confirmation strip -->
+                        <t t-if="state.fastSale.lastSale">
+                            <div class="o_isg_fast_receipt">
+                                <div class="o_isg_fast_receipt_info">
+                                    <i class="fa fa-check-circle o_isg_c_green me-2"/>
+                                    <strong><t t-out="state.fastSale.lastSale.soName"/></strong>
+                                    <t t-if="state.fastSale.lastSale.invName">
+                                        <span class="o_isg_muted"> / </span>
+                                        <strong><t t-out="state.fastSale.lastSale.invName"/></strong>
+                                    </t>
+                                    <span class="o_isg_muted"> · <t t-out="state.fastSale.lastSale.customer"/> · </span>
+                                    <strong class="o_isg_num"><t t-out="fmt(state.fastSale.lastSale.amount)"/> <t t-out="state.currency"/></strong>
+                                    <span class="o_isg_status_badge o_isg_status_emerald ms-2">
+                                        <i class="o_isg_status_dot"/>
+                                        <t t-out="state.fastSale.lastSale.badge"/>
+                                    </span>
+                                </div>
+                                <div class="o_isg_fast_receipt_actions">
+                                    <t t-if="state.fastSale.lastSale.invId">
+                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.printInvoicePdf(state.fastSale.lastSale.invId)">
+                                            <i class="fa fa-print me-1"/>Print Invoice
+                                        </button>
+                                    </t>
+                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.printProForma(state.fastSale.lastSale.soId)">
+                                        <i class="fa fa-file-pdf-o me-1"/>Pro-Forma PDF
+                                    </button>
+                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openRecord('sale.order', state.fastSale.lastSale.soId)">
+                                        Open Record
+                                    </button>
+                                    <button type="button" class="o_isg_btn o_isg_btn_icon o_isg_btn_xs" t-on-click="() => { state.fastSale.lastSale = null; }" title="Dismiss">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="o_isg_terminal_split">
+                            <!-- LEFT PANE: CATALOG -->
+                            <div class="o_isg_catalog_pane">
+                                <div class="o_isg_catalog_controls">
+                                    <div class="o_isg_search_field">
+                                        <i class="fa fa-search"/>
+                                        <input type="text"
+                                            placeholder="Filter products by name or unit..."
+                                            t-att-value="state.fastSale.search"
+                                            t-on-input="(ev) => { state.fastSale.search = ev.target.value; }"/>
+                                        <button t-if="state.fastSale.search" type="button" class="o_isg_search_clear" t-on-click="() => { state.fastSale.search = ''; }">
+                                            <i class="fa fa-times"/>
+                                        </button>
+                                    </div>
+                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => { state.fastSale.showNewItem = !state.fastSale.showNewItem; }">
+                                        <i class="fa fa-plus me-1"/>New Product
+                                    </button>
+                                </div>
+
+                                <t t-if="state.fastSale.showNewItem">
+                                    <div class="o_isg_inline_form">
+                                        <input type="text"
+                                            class="o_isg_field"
+                                            placeholder="Product name (e.g. Steel Bar 12mm)"
+                                            t-att-value="state.fastSale.newItemName"
+                                            t-on-input="(ev) => { state.fastSale.newItemName = ev.target.value; }"/>
+                                        <input type="number"
+                                            class="o_isg_field o_isg_field_sm"
+                                            placeholder="Unit price (RWF)"
+                                            t-att-value="state.fastSale.newItemPrice"
+                                            t-on-input="(ev) => { state.fastSale.newItemPrice = ev.target.value; }"/>
+                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.createQuickItem()">
+                                            Create &amp; Add
+                                        </button>
+                                    </div>
+                                </t>
+
+                                <!-- Segmented Category Tabs -->
+                                <div class="o_isg_seg_tabs">
+                                    <t t-foreach="state.fastSale.categories" t-as="cat" t-key="cat.key">
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.fastSale.category === cat.key ? 'active' : '' }}"
+                                            t-on-click="() => { state.fastSale.category = cat.key; }">
+                                            <t t-out="cat.label"/>
+                                        </button>
+                                    </t>
+                                </div>
+
+                                <!-- Product Tiles Grid -->
+                                <div class="o_isg_product_grid">
+                                    <t t-foreach="filteredFastProducts" t-as="p" t-key="p.id">
+                                        <t t-set="inCartQty" t-value="cartQtyFor(p.id)"/>
+                                        <div t-attf-class="o_isg_prod_tile {{ inCartQty ? 'is_selected' : '' }}"
+                                            role="button" tabindex="0"
+                                            t-on-click="() => this.addToCart(p, 1)"
+                                            t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.addToCart(p, 1))">
+                                            <div class="o_isg_prod_media">
+                                                <img class="o_isg_prod_img" t-att-src="p.imageUrl" t-att-alt="p.name" loading="lazy"/>
+                                                <span class="o_isg_prod_uom"><t t-out="p.uom"/></span>
+                                                <span t-if="inCartQty" class="o_isg_prod_count"><t t-out="inCartQty"/></span>
+                                                <span t-attf-class="o_isg_prod_stock o_isg_stock_{{ p.stockState }} o_isg_num">
+                                                    <i class="o_isg_status_dot"/>
+                                                    <t t-out="p.stockLabel"/>
+                                                </span>
+                                            </div>
+                                            <div class="o_isg_prod_body">
+                                                <div class="o_isg_prod_title" t-att-title="p.name"><t t-out="p.name"/></div>
+                                                <div class="o_isg_prod_price o_isg_num">
+                                                    <t t-if="p.price &gt; 0">
+                                                        <t t-out="fmt(p.price)"/> <span class="o_isg_curr"><t t-out="state.currency"/></span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <span class="o_isg_price_unset">Enter price in order</span>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                            <div class="o_isg_prod_steps" t-on-click.stop="">
+                                                <button type="button" t-on-click="() => this.addToCart(p, 1)">+1</button>
+                                                <button type="button" t-on-click="() => this.addToCart(p, 5)">+5</button>
+                                                <button type="button" t-on-click="() => this.addToCart(p, 10)">+10</button>
+                                                <button type="button" t-on-click="() => this.addToCart(p, 50)">+50</button>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT PANE: ORDER SUMMARY & SETTLEMENT -->
+                            <div class="o_isg_order_pane">
+                                <!-- Customer Selection -->
+                                <div class="o_isg_order_section">
+                                    <div class="o_isg_sec_bar">
+                                        <span class="o_isg_sec_title">Customer</span>
+                                        <button type="button" class="o_isg_text_btn" t-on-click="() => { state.fastSale.showNewCustomer = !state.fastSale.showNewCustomer; }">
+                                            + New Customer
+                                        </button>
+                                    </div>
+                                    <div class="o_isg_customer_pills">
+                                        <t t-foreach="state.fastSale.customers.slice(0, 6)" t-as="c" t-key="c.id">
+                                            <button type="button"
+                                                t-attf-class="o_isg_cust_pill {{ state.fastSale.partnerId === c.id ? 'active' : '' }}"
+                                                t-on-click="() => this.selectFastCustomer(c.id)">
+                                                <t t-out="c.shortName"/>
+                                            </button>
+                                        </t>
+                                    </div>
+                                    <t t-if="state.fastSale.showNewCustomer">
+                                        <div class="o_isg_inline_form mt-2">
+                                            <input type="text"
+                                                class="o_isg_field"
+                                                placeholder="Full name or company"
+                                                t-att-value="state.fastSale.newCustomerName"
+                                                t-on-input="(ev) => { state.fastSale.newCustomerName = ev.target.value; }"/>
+                                            <input type="text"
+                                                class="o_isg_field o_isg_field_sm"
+                                                placeholder="Phone"
+                                                t-att-value="state.fastSale.newCustomerPhone"
+                                                t-on-input="(ev) => { state.fastSale.newCustomerPhone = ev.target.value; }"/>
+                                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.createQuickCustomer()">
+                                                Save
+                                            </button>
+                                        </div>
+                                    </t>
+                                </div>
+
+                                <!-- Line Items -->
+                                <div class="o_isg_order_section o_isg_order_lines_wrap">
+                                    <div class="o_isg_sec_bar">
+                                        <span class="o_isg_sec_title">Order Lines (<t t-out="state.fastSale.cart.length"/>)</span>
+                                        <button t-if="state.fastSale.cart.length" type="button" class="o_isg_text_btn o_isg_text_danger" t-on-click="() => this.clearCart()">
+                                            Clear all
+                                        </button>
+                                    </div>
+
+                                    <t t-if="state.fastSale.cart.length">
+                                        <div class="o_isg_line_list">
+                                            <t t-foreach="state.fastSale.cart" t-as="item" t-key="item.id">
+                                                <div class="o_isg_line_row">
+                                                    <img class="o_isg_line_thumb" t-att-src="item.imageUrl" t-att-alt="item.name"/>
+                                                    <div class="o_isg_line_meta">
+                                                        <div class="o_isg_line_name"><t t-out="item.name"/></div>
+                                                        <div class="o_isg_line_uom"><t t-out="item.uom"/></div>
+                                                    </div>
+                                                    <div class="o_isg_line_inputs">
+                                                        <div class="o_isg_stepper">
+                                                            <button type="button" t-on-click="() => this.updateCartQty(item.id, -1)">−</button>
+                                                            <input type="number" min="1" step="any"
+                                                                aria-label="Quantity"
+                                                                t-att-value="item.qty"
+                                                                t-on-change="(ev) => this.setCartQty(item.id, ev.target.value)"/>
+                                                            <button type="button" t-on-click="() => this.updateCartQty(item.id, 1)">+</button>
+                                                        </div>
+                                                        <input type="number" min="0" step="100"
+                                                            class="o_isg_price_input o_isg_num"
+                                                            aria-label="Unit Price"
+                                                            t-att-value="item.price"
+                                                            t-on-change="(ev) => this.setCartPrice(item.id, ev.target.value)"/>
+                                                        <div class="o_isg_line_amount o_isg_num">
+                                                            <t t-out="fmt(item.qty * item.price)"/>
+                                                        </div>
+                                                        <button type="button" class="o_isg_line_remove" t-on-click="() => this.removeFromCart(item.id)" title="Remove line">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="o_isg_order_empty">
+                                            <span>Select products from the catalog to build an order</span>
+                                        </div>
+                                    </t>
+                                </div>
+
+                                <!-- Order Modifiers -->
+                                <div class="o_isg_order_section">
+                                    <div class="o_isg_modifier_bar">
+                                        <button type="button"
+                                            t-attf-class="o_isg_mod_chip {{ state.fastSale.applyVat ? 'active' : '' }}"
+                                            t-on-click="() => { state.fastSale.applyVat = !state.fastSale.applyVat; }">
+                                            <i t-attf-class="fa {{ state.fastSale.applyVat ? 'fa-check' : 'fa-plus' }} me-1"/>
+                                            VAT <t t-out="state.fastSale.vatRate"/>%
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_mod_chip {{ state.fastSale.autoPrint ? 'active' : '' }}"
+                                            t-on-click="() => { state.fastSale.autoPrint = !state.fastSale.autoPrint; }">
+                                            <i class="fa fa-print me-1"/>Auto-Print PDF
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_mod_chip {{ state.fastSale.addDelivery ? 'active' : '' }}"
+                                            t-on-click="() => { state.fastSale.addDelivery = !state.fastSale.addDelivery; }">
+                                            <i class="fa fa-truck me-1"/>Dispatch Delivery
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_mod_chip {{ state.fastSale.splitOpen ? 'active' : '' }}"
+                                            t-on-click="() => this.toggleSplitPayment()">
+                                            <i class="fa fa-columns me-1"/>Split Payment
+                                        </button>
+                                    </div>
+
+                                    <t t-if="state.fastSale.addDelivery">
+                                        <div class="o_isg_inline_form mt-2">
+                                            <select class="o_isg_field"
+                                                t-on-change="(ev) => this.setVehicleId(ev.target.value)">
+                                                <t t-foreach="state.vehicles" t-as="v" t-key="v.id">
+                                                    <option t-att-value="v.id" t-att-selected="state.fastSale.vehicleId === v.id">
+                                                        <t t-out="v.plate"/> · <t t-out="v.name"/>
+                                                    </option>
+                                                </t>
+                                            </select>
+                                            <input type="text"
+                                                class="o_isg_field"
+                                                placeholder="Destination site"
+                                                t-att-value="state.fastSale.destination"
+                                                t-on-input="(ev) => { state.fastSale.destination = ev.target.value; }"/>
+                                            <input type="number"
+                                                class="o_isg_field o_isg_field_sm"
+                                                placeholder="Delivery fee"
+                                                t-att-value="state.fastSale.deliveryFee"
+                                                t-on-input="(ev) => { state.fastSale.deliveryFee = ev.target.value; }"/>
+                                        </div>
+                                    </t>
+                                </div>
+
+                                <!-- Settlement Summary & Tender Buttons -->
+                                <div class="o_isg_settlement">
+                                    <div class="o_isg_summary_rows">
+                                        <t t-if="state.fastSale.applyVat or state.fastSale.addDelivery">
+                                            <div class="o_isg_sum_line">
+                                                <span>Subtotal</span>
+                                                <span class="o_isg_num"><t t-out="fmt(fastCartSubtotal)"/> <t t-out="state.currency"/></span>
+                                            </div>
+                                        </t>
+                                        <t t-if="state.fastSale.applyVat">
+                                            <div class="o_isg_sum_line">
+                                                <span>VAT (<t t-out="state.fastSale.vatRate"/>%)</span>
+                                                <span class="o_isg_num"><t t-out="fmt(fastCartVat)"/> <t t-out="state.currency"/></span>
+                                            </div>
+                                        </t>
+                                        <t t-if="state.fastSale.addDelivery and state.fastSale.deliveryFee">
+                                            <div class="o_isg_sum_line">
+                                                <span>Delivery Fee</span>
+                                                <span class="o_isg_num"><t t-out="fmt(state.fastSale.deliveryFee)"/> <t t-out="state.currency"/></span>
+                                            </div>
+                                        </t>
+                                        <div class="o_isg_sum_total">
+                                            <span>Total Due</span>
+                                            <strong class="o_isg_num"><t t-out="fmt(fastCartTotal)"/> <small><t t-out="state.currency"/></small></strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- MULTI-METHOD SPLIT PAYMENT PANEL -->
+                                    <t t-if="state.fastSale.splitOpen">
+                                        <div class="o_isg_split_box">
+                                            <div class="o_isg_split_head">
+                                                <span class="o_isg_sec_title">Split Payment Allocation</span>
+                                                <span class="o_isg_split_status o_isg_num">
+                                                    <t t-if="fastSplitRemaining &gt; 0">
+                                                        Paid: <strong><t t-out="fmt(fastSplitPaid)"/></strong> · Credit Balance: <strong class="o_isg_c_rose"><t t-out="fmt(fastSplitRemaining)"/> <t t-out="state.currency"/></strong>
+                                                    </t>
+                                                    <t t-elif="fastSplitRemaining === 0 and fastCartTotal &gt; 0">
+                                                        <span class="o_isg_c_green"><i class="fa fa-check-circle me-1"/>100% Allocated (<t t-out="fmt(fastSplitPaid)"/> <t t-out="state.currency"/>)</span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        Allocated: <strong><t t-out="fmt(fastSplitPaid)"/> <t t-out="state.currency"/></strong>
+                                                    </t>
+                                                </span>
+                                            </div>
+
+                                            <div class="o_isg_split_cols">
+                                                <div class="o_isg_split_col">
+                                                    <div class="o_isg_split_lbl">
+                                                        <span>Cash</span>
+                                                        <div class="o_isg_split_mini_btns">
+                                                            <button type="button" t-on-click="() => this.fillSplitRemainder('cash')">Rest</button>
+                                                            <button type="button" t-on-click="() => this.clearSplitMethod('cash')">0</button>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" min="0" step="500"
+                                                        class="o_isg_field o_isg_num"
+                                                        t-att-value="state.fastSale.split.cash"
+                                                        t-on-input="(ev) => this.setSplitAmount('cash', ev.target.value)"/>
+                                                </div>
+
+                                                <div class="o_isg_split_col">
+                                                    <div class="o_isg_split_lbl">
+                                                        <span>MTN MoMo</span>
+                                                        <div class="o_isg_split_mini_btns">
+                                                            <button type="button" t-on-click="() => this.fillSplitRemainder('momo')">Rest</button>
+                                                            <button type="button" t-on-click="() => this.clearSplitMethod('momo')">0</button>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" min="0" step="500"
+                                                        class="o_isg_field o_isg_num"
+                                                        t-att-value="state.fastSale.split.momo"
+                                                        t-on-input="(ev) => this.setSplitAmount('momo', ev.target.value)"/>
+                                                </div>
+
+                                                <div class="o_isg_split_col">
+                                                    <div class="o_isg_split_lbl">
+                                                        <span>Bank Transfer</span>
+                                                        <div class="o_isg_split_mini_btns">
+                                                            <button type="button" t-on-click="() => this.fillSplitRemainder('bank')">Rest</button>
+                                                            <button type="button" t-on-click="() => this.clearSplitMethod('bank')">0</button>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" min="0" step="500"
+                                                        class="o_isg_field o_isg_num"
+                                                        t-att-value="state.fastSale.split.bank"
+                                                        t-on-input="(ev) => this.setSplitAmount('bank', ev.target.value)"/>
+                                                </div>
+                                            </div>
+
+                                            <button type="button"
+                                                class="o_isg_tender_btn o_isg_tender_primary w-100 mt-2"
+                                                t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length or fastSplitPaid &lt;= 0"
+                                                t-on-click="() => this.completeFastSale('split')">
+                                                <span class="o_isg_tender_label">
+                                                    <i t-attf-class="fa {{ state.fastSale.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>
+                                                    Complete Split Settlement (<t t-out="fmt(fastSplitPaid)"/> <t t-out="state.currency"/>)
+                                                </span>
+                                                <span class="o_isg_tender_sub">
+                                                    Registers each payment method separately on the invoice
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </t>
+
+                                    <div class="o_isg_tender_grid">
+                                        <button type="button"
+                                            class="o_isg_tender_btn o_isg_tender_primary"
+                                            t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length"
+                                            t-on-click="() => this.completeFastSale('cash')">
+                                            <span class="o_isg_tender_label">
+                                                <i t-attf-class="fa {{ state.fastSale.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>
+                                                Cash Settlement
+                                            </span>
+                                            <span class="o_isg_tender_sub">Instant paid invoice</span>
+                                        </button>
+                                        <button type="button"
+                                            class="o_isg_tender_btn o_isg_tender_sec"
+                                            t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length"
+                                            t-on-click="() => this.completeFastSale('momo')">
+                                            <span class="o_isg_tender_label">MTN MoMo</span>
+                                            <span class="o_isg_tender_sub">Mobile money</span>
+                                        </button>
+                                        <button type="button"
+                                            class="o_isg_tender_btn o_isg_tender_sec"
+                                            t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length"
+                                            t-on-click="() => this.completeFastSale('bank')">
+                                            <span class="o_isg_tender_label">Bank Transfer</span>
+                                            <span class="o_isg_tender_sub">Account deposit</span>
+                                        </button>
+                                    </div>
+
+                                    <div class="o_isg_tender_alt">
+                                        <button type="button"
+                                            t-attf-class="o_isg_btn o_isg_btn_sec o_isg_btn_xs {{ state.fastSale.splitOpen ? 'is_active' : '' }}"
+                                            t-on-click="() => this.toggleSplitPayment()">
+                                            <i class="fa fa-columns me-1"/>Split Payment (Cash + MoMo + Bank)
+                                        </button>
+                                        <button type="button"
+                                            class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                            t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length"
+                                            t-on-click="() => this.completeFastSale('credit')">
+                                            Credit (Pay Later)
+                                        </button>
+                                        <button type="button"
+                                            class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                            t-att-disabled="state.fastSale.busy or !state.fastSale.cart.length"
+                                            t-on-click="() => this.completeFastSale('quotation')">
+                                            Pro-Forma PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </t>
+
+                <!-- ============ STOCK & INVENTORY CONTROL TERMINAL ============ -->
+                <t t-if="state.stockMgr.open">
+                    <section class="o_isg_terminal o_isg_stock_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator o_isg_ind_blue"/>
+                                <h2>Stock &amp; Inventory Control</h2>
+                                <span class="o_isg_terminal_meta">Live Warehouse Quants, 1-Click Restocking, Supplier Receipts &amp; Pricing</span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                    t-on-click="() => { state.stockMgr.showNewProduct = !state.stockMgr.showNewProduct; }">
+                                    <i class="fa fa-plus me-1"/>New Stock Product
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openPurchases()">
+                                    <i class="fa fa-list-ul me-1"/>Purchase Orders
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleStockManager(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4-Column Inventory Valuation & Health Summary -->
+                        <div class="o_isg_stock_summary_strip">
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Inventory Value (At Cost)</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(state.stockMgr.costValuation)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num"><t t-out="fmt(state.stockMgr.totalUnitsOnHand)"/> total units on hand</span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Retail Stock Value</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(state.stockMgr.retailValuation)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub">At current selling prices</span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Projected Gross Margin</span>
+                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_green">
+                                    +<t t-out="fmt(state.stockMgr.projectedMargin)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="pct(state.stockMgr.projectedMargin, state.stockMgr.retailValuation)"/>% average retail margin
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Stock Health Status</span>
+                                <div class="o_isg_stock_health_pills">
+                                    <span class="o_isg_status_badge o_isg_status_emerald o_isg_num">
+                                        <i class="o_isg_status_dot"/><t t-out="state.stockMgr.healthyCount"/> Healthy
+                                    </span>
+                                    <span t-if="state.stockMgr.lowCount" class="o_isg_status_badge o_isg_status_amber o_isg_num">
+                                        <i class="o_isg_status_dot"/><t t-out="state.stockMgr.lowCount"/> Low
+                                    </span>
+                                    <span t-if="state.stockMgr.outCount" class="o_isg_status_badge o_isg_status_rose o_isg_num">
+                                        <i class="o_isg_status_dot"/><t t-out="state.stockMgr.outCount"/> Out
+                                    </span>
+                                </div>
+                                <span class="o_isg_stock_stat_sub">Low threshold: 15 units</span>
+                            </div>
+                        </div>
+
+                        <!-- Inline New Stock Product Form -->
+                        <t t-if="state.stockMgr.showNewProduct">
+                            <div class="o_isg_stock_new_bar">
+                                <input type="text" class="o_isg_field"
+                                    placeholder="Product name (e.g. Steel Bar Y12)"
+                                    t-att-value="state.stockMgr.newName"
+                                    t-on-input="(ev) => { state.stockMgr.newName = ev.target.value; }"/>
+                                <select class="o_isg_field o_isg_field_sm"
+                                    t-on-change="(ev) => { state.stockMgr.newCategory = ev.target.value; }">
+                                    <option value="cement_aggregates">Cement &amp; Aggregates</option>
+                                    <option value="paint_finishing">Paint, Gypsum &amp; Finishing</option>
+                                    <option value="steel_iron">Steel, Iron &amp; Nails</option>
+                                    <option value="timber_roofing">Timber &amp; Roofing</option>
+                                    <option value="plumbing">Plumbing &amp; Pipes</option>
+                                    <option value="electrical">Electrical</option>
+                                    <option value="tools_hardware">Tools &amp; General</option>
+                                </select>
+                                <input type="number" class="o_isg_field o_isg_field_sm o_isg_num"
+                                    placeholder="Unit Cost (RWF)"
+                                    t-att-value="state.stockMgr.newCost"
+                                    t-on-input="(ev) => { state.stockMgr.newCost = ev.target.value; }"/>
+                                <input type="number" class="o_isg_field o_isg_field_sm o_isg_num"
+                                    placeholder="Sell Price (RWF)"
+                                    t-att-value="state.stockMgr.newPrice"
+                                    t-on-input="(ev) => { state.stockMgr.newPrice = ev.target.value; }"/>
+                                <input type="number" class="o_isg_field o_isg_field_sm o_isg_num"
+                                    placeholder="Opening Stock Qty"
+                                    t-att-value="state.stockMgr.newQty"
+                                    t-on-input="(ev) => { state.stockMgr.newQty = ev.target.value; }"/>
+                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                    t-att-disabled="state.stockMgr.busy"
+                                    t-on-click="() => this.createStockItem()">
+                                    <i class="fa fa-check me-1"/>Create &amp; Stock
+                                </button>
+                            </div>
+                        </t>
+
+                        <div class="o_isg_stock_split">
+                            <!-- LEFT: compact, scannable product list -->
+                            <div class="o_isg_stock_list_pane">
+                                <div class="o_isg_stock_toolbar">
+                                    <div class="o_isg_search_field o_isg_stock_search">
+                                        <i class="fa fa-search"/>
+                                        <input type="text"
+                                            placeholder="Search products..."
+                                            t-att-value="state.stockMgr.search"
+                                            t-on-input="(ev) => { state.stockMgr.search = ev.target.value; }"/>
+                                    </div>
+                                    <div class="o_isg_seg_tabs mb-0">
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.stockMgr.filter === 'all' ? 'active' : '' }}"
+                                            t-on-click="() => { state.stockMgr.filter = 'all'; }">
+                                            All <t t-out="state.fastSale.products.length"/>
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.stockMgr.filter === 'low' ? 'active' : '' }}"
+                                            t-on-click="() => { state.stockMgr.filter = 'low'; }">
+                                            Needs restock <t t-out="state.stockMgr.lowCount + state.stockMgr.outCount"/>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="o_isg_stock_list">
+                                    <t t-foreach="filteredStockProducts" t-as="prod" t-key="prod.id">
+                                        <div t-attf-class="o_isg_stock_row {{ state.stockMgr.selectedId === prod.id ? 'is_selected' : '' }}"
+                                            role="button" tabindex="0"
+                                            t-on-click="() => this.selectStockProduct(prod)"
+                                            t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.selectStockProduct(prod))">
+                                            <img class="o_isg_line_thumb" t-att-src="prod.imageUrl" t-att-alt="prod.name"/>
+                                            <div class="o_isg_stock_row_main">
+                                                <div class="o_isg_person_name"><t t-out="prod.name"/></div>
+                                                <div class="o_isg_muted small"><t t-out="prod.categoryLabel"/></div>
+                                            </div>
+                                            <div class="o_isg_stock_row_qty">
+                                                <div class="o_isg_stock_qty_big o_isg_num"><t t-out="fmt(prod.qty)"/> <small class="o_isg_muted"><t t-out="prod.uom"/></small></div>
+                                                <span t-attf-class="o_isg_status_badge {{ prod.stockState === 'ok' ? 'o_isg_status_emerald' : (prod.stockState === 'low' ? 'o_isg_status_amber' : 'o_isg_status_rose') }}">
+                                                    <i class="o_isg_status_dot"/>
+                                                    <t t-if="prod.stockState === 'ok'">In stock</t>
+                                                    <t t-elif="prod.stockState === 'low'">Low</t>
+                                                    <t t-else="">Out</t>
+                                                </span>
+                                            </div>
+                                            <i class="fa fa-angle-right o_isg_stock_row_chev"/>
+                                        </div>
+                                    </t>
+                                    <div t-if="!filteredStockProducts.length" class="o_isg_empty o_isg_empty_sm">
+                                        <div>No products match this filter</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT: focused Adjust Stock panel -->
+                            <div class="o_isg_stock_panel_pane">
+                                <t t-set="sel" t-value="stockSelected"/>
+                                <t t-if="sel">
+                                    <div class="o_isg_adj_head">
+                                        <img class="o_isg_adj_thumb" t-att-src="sel.imageUrl" t-att-alt="sel.name"/>
+                                        <div class="o_isg_adj_head_main">
+                                            <div class="o_isg_adj_name"><t t-out="sel.name"/></div>
+                                            <div class="o_isg_muted small"><t t-out="sel.categoryLabel"/> · <t t-out="sel.uom"/></div>
+                                        </div>
+                                        <div class="o_isg_adj_onhand">
+                                            <span class="o_isg_adj_onhand_lbl">On hand</span>
+                                            <strong class="o_isg_num"><t t-out="fmt(sel.qty)"/></strong>
+                                        </div>
+                                        <button type="button" class="o_isg_btn o_isg_btn_icon o_isg_btn_xs" t-on-click="() => this.closeStockPanel()" title="Close panel">
+                                            <i class="fa fa-times"/>
+                                        </button>
+                                    </div>
+
+                                    <div class="o_isg_adj_tabs">
+                                        <button type="button" t-attf-class="o_isg_adj_tab {{ state.stockMgr.tab === 'adjust' ? 'active' : '' }}" t-on-click="() => { state.stockMgr.tab = 'adjust'; }">Adjust stock</button>
+                                        <button type="button" t-attf-class="o_isg_adj_tab {{ state.stockMgr.tab === 'history' ? 'active' : '' }}" t-on-click="() => { state.stockMgr.tab = 'history'; }">History</button>
+                                        <button type="button" t-attf-class="o_isg_adj_tab {{ state.stockMgr.tab === 'pricing' ? 'active' : '' }}" t-on-click="() => { state.stockMgr.tab = 'pricing'; }">Pricing</button>
+                                    </div>
+
+                                    <!-- ADJUST TAB -->
+                                    <t t-if="state.stockMgr.tab === 'adjust'">
+                                        <div class="o_isg_adj_body">
+                                            <div class="o_isg_adj_modes">
+                                                <button type="button" t-attf-class="o_isg_adj_mode {{ state.stockMgr.mode === 'add' ? 'active is_add' : '' }}" t-on-click="() => this.setAdjustMode('add')">
+                                                    <i class="fa fa-plus"/><span>Add stock</span><small>Receive items</small>
+                                                </button>
+                                                <button type="button" t-attf-class="o_isg_adj_mode {{ state.stockMgr.mode === 'remove' ? 'active is_remove' : '' }}" t-on-click="() => this.setAdjustMode('remove')">
+                                                    <i class="fa fa-minus"/><span>Remove stock</span><small>Damaged, lost…</small>
+                                                </button>
+                                                <button type="button" t-attf-class="o_isg_adj_mode {{ state.stockMgr.mode === 'count' ? 'active is_count' : '' }}" t-on-click="() => this.setAdjustMode('count')">
+                                                    <i class="fa fa-pencil"/><span>Set count</span><small>Physical count</small>
+                                                </button>
+                                            </div>
+
+                                            <label class="o_isg_adj_label">
+                                                <t t-if="state.stockMgr.mode === 'add'">Quantity to add</t>
+                                                <t t-elif="state.stockMgr.mode === 'remove'">Quantity to remove</t>
+                                                <t t-else="">Counted quantity (what is really on the shelf)</t>
+                                            </label>
+                                            <div class="o_isg_adj_qty">
+                                                <button type="button" class="o_isg_adj_step" t-on-click="() => this.bumpAdjustQty(-1)">−</button>
+                                                <input type="number" min="0" step="1" inputmode="numeric"
+                                                    class="o_isg_adj_qty_input o_isg_num"
+                                                    placeholder="0"
+                                                    t-att-value="state.stockMgr.qty"
+                                                    t-on-input="(ev) => { state.stockMgr.qty = ev.target.value; }"/>
+                                                <button type="button" class="o_isg_adj_step" t-on-click="() => this.bumpAdjustQty(1)">+</button>
+                                            </div>
+                                            <div t-if="state.stockMgr.mode !== 'count'" class="o_isg_adj_chips">
+                                                <button type="button" class="o_isg_stock_chip" t-on-click="() => this.bumpAdjustQty(5)">+5</button>
+                                                <button type="button" class="o_isg_stock_chip" t-on-click="() => this.bumpAdjustQty(10)">+10</button>
+                                                <button type="button" class="o_isg_stock_chip" t-on-click="() => this.bumpAdjustQty(50)">+50</button>
+                                                <button type="button" class="o_isg_stock_chip" t-on-click="() => this.bumpAdjustQty(100)">+100</button>
+                                            </div>
+                                            <div t-if="adjustError" class="o_isg_adj_error">
+                                                <i class="fa fa-exclamation-circle me-1"/><t t-out="adjustError"/>
+                                            </div>
+
+                                            <label class="o_isg_adj_label">Reason</label>
+                                            <div class="o_isg_adj_reasons">
+                                                <t t-foreach="adjustReasons" t-as="r" t-key="r.key">
+                                                    <button type="button"
+                                                        t-attf-class="o_isg_cust_pill {{ state.stockMgr.reason === r.key ? 'active' : '' }}"
+                                                        t-on-click="() => this.selectAdjustReason(r.key)">
+                                                        <t t-out="r.label"/>
+                                                    </button>
+                                                </t>
+                                            </div>
+
+                                            <t t-if="state.stockMgr.mode === 'add' and state.stockMgr.reason === 'delivery'">
+                                                <div class="o_isg_adj_po">
+                                                    <button type="button"
+                                                        t-attf-class="o_isg_mod_chip {{ state.stockMgr.usePO ? 'active' : '' }}"
+                                                        t-on-click="() => { state.stockMgr.usePO = !state.stockMgr.usePO; }">
+                                                        <i t-attf-class="fa {{ state.stockMgr.usePO ? 'fa-check' : 'fa-file-text-o' }} me-1"/>
+                                                        Also record a purchase order
+                                                    </button>
+                                                    <select t-if="state.stockMgr.usePO" class="o_isg_field"
+                                                        t-on-change="(ev) => this.setSupplierId(ev.target.value)">
+                                                        <t t-foreach="state.stockMgr.suppliers" t-as="sup" t-key="sup.id">
+                                                            <option t-att-value="sup.id" t-att-selected="state.stockMgr.supplierId === sup.id"><t t-out="sup.shortName"/></option>
+                                                        </t>
+                                                    </select>
+                                                </div>
+                                            </t>
+
+                                            <label class="o_isg_adj_label"><span>Note <span class="o_isg_muted">(optional)</span></span></label>
+                                            <input type="text" class="o_isg_field o_isg_adj_note"
+                                                placeholder="e.g. Delivery note #4521, 3 bags torn"
+                                                t-att-value="state.stockMgr.note"
+                                                t-on-input="(ev) => { state.stockMgr.note = ev.target.value; }"/>
+
+                                            <!-- Before / after preview -->
+                                            <div t-attf-class="o_isg_adj_preview {{ adjustDelta &gt; 0 ? 'is_up' : (adjustDelta &lt; 0 ? 'is_down' : '') }}">
+                                                <div class="o_isg_adj_pv_col">
+                                                    <span>Now</span>
+                                                    <strong class="o_isg_num"><t t-out="fmt(sel.qty)"/></strong>
+                                                </div>
+                                                <i class="fa fa-long-arrow-right o_isg_adj_pv_arrow"/>
+                                                <div class="o_isg_adj_pv_col">
+                                                    <span>After</span>
+                                                    <strong class="o_isg_num"><t t-out="fmt(adjustAfter)"/></strong>
+                                                </div>
+                                                <div class="o_isg_adj_pv_delta o_isg_num">
+                                                    <t t-if="adjustDelta !== 0">
+                                                        <t t-if="adjustDelta &gt; 0">+</t><t t-out="fmt(adjustDelta)"/> <t t-out="sel.uom"/>
+                                                        <small>Stock value <t t-if="adjustDelta &gt; 0">+</t><t t-out="fmt(adjustDelta * sel.cost)"/> <t t-out="state.currency"/></small>
+                                                    </t>
+                                                    <t t-else=""><small>No change yet</small></t>
+                                                </div>
+                                            </div>
+
+                                            <button type="button"
+                                                t-attf-class="o_isg_adj_apply {{ state.stockMgr.mode === 'remove' ? 'is_remove' : '' }}"
+                                                t-att-disabled="state.stockMgr.busy or !adjustReady"
+                                                t-on-click="() => this.applyAdjustment()">
+                                                <i t-attf-class="fa {{ state.stockMgr.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>
+                                                <t t-if="state.stockMgr.mode === 'add'">Add to stock</t>
+                                                <t t-elif="state.stockMgr.mode === 'remove'">Remove from stock</t>
+                                                <t t-else="">Save new count</t>
+                                            </button>
+                                        </div>
+                                    </t>
+
+                                    <!-- HISTORY TAB -->
+                                    <t t-if="state.stockMgr.tab === 'history'">
+                                        <div class="o_isg_adj_body">
+                                            <div t-if="state.stockMgr.historyLoading" class="o_isg_empty o_isg_empty_sm"><div>Loading movements…</div></div>
+                                            <div t-elif="!state.stockMgr.history.length" class="o_isg_empty o_isg_empty_sm"><div>No stock movements yet</div></div>
+                                            <div t-else="" class="o_isg_adj_history">
+                                                <t t-foreach="state.stockMgr.history" t-as="h" t-key="h.id">
+                                                    <div class="o_isg_adj_hist_row">
+                                                        <span t-attf-class="o_isg_adj_hist_icon {{ h.incoming ? 'is_in' : 'is_out' }}">
+                                                            <i t-attf-class="fa {{ h.incoming ? 'fa-arrow-down' : 'fa-arrow-up' }}"/>
+                                                        </span>
+                                                        <div class="o_isg_adj_hist_main">
+                                                            <div class="o_isg_person_name"><t t-out="h.label"/></div>
+                                                            <div class="o_isg_muted small o_isg_num"><t t-out="h.when"/></div>
+                                                        </div>
+                                                        <strong t-attf-class="o_isg_num {{ h.incoming ? 'o_isg_c_green' : 'o_isg_c_rose' }}">
+                                                            <t t-if="h.incoming">+</t><t t-out="fmt(h.signed)"/>
+                                                        </strong>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+
+                                    <!-- PRICING TAB -->
+                                    <t t-if="state.stockMgr.tab === 'pricing'">
+                                        <div class="o_isg_adj_body">
+                                            <div class="o_isg_adj_price_grid">
+                                                <label class="o_isg_adj_label">Unit cost (<t t-out="state.currency"/>)
+                                                    <input type="number" min="0" step="100" class="o_isg_field o_isg_num"
+                                                        t-att-value="sel.editCost"
+                                                        t-on-input="(ev) => { sel.editCost = ev.target.value; }"/>
+                                                </label>
+                                                <label class="o_isg_adj_label">Selling price (<t t-out="state.currency"/>)
+                                                    <input type="number" min="0" step="100" class="o_isg_field o_isg_num"
+                                                        t-att-value="sel.editPrice"
+                                                        t-on-input="(ev) => { sel.editPrice = ev.target.value; }"/>
+                                                </label>
+                                            </div>
+                                            <div t-attf-class="o_isg_adj_preview {{ selectedMarginAmt &lt; 0 ? 'is_down' : 'is_up' }}">
+                                                <div class="o_isg_adj_pv_col"><span>Margin per unit</span><strong class="o_isg_num"><t t-out="fmt(selectedMarginAmt)"/></strong></div>
+                                                <div class="o_isg_adj_pv_col"><span>Margin</span><strong class="o_isg_num"><t t-out="selectedMarginPct"/>%</strong></div>
+                                            </div>
+                                            <button type="button" class="o_isg_adj_apply"
+                                                t-att-disabled="state.stockMgr.busy"
+                                                t-on-click="() => this.saveProductPrices(sel)">
+                                                <i class="fa fa-check me-1"/>Save prices
+                                            </button>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <div class="o_isg_adj_empty">
+                                        <i class="fa fa-hand-pointer-o"/>
+                                        <div class="o_isg_adj_empty_title">Select a product</div>
+                                        <div class="o_isg_muted">Pick an item on the left to add stock, remove damaged goods, or enter a physical count.</div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </section>
+                </t>
+
+                <!-- ============ VEHICLE & FLEET MANAGEMENT TERMINAL ============ -->
+                <t t-if="state.fleetMgr.open">
+                    <section class="o_isg_terminal o_isg_fleet_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator o_isg_ind_amber"/>
+                                <h2>Vehicle &amp; Fleet Control</h2>
+                                <span class="o_isg_terminal_meta">Per-Vehicle Income, Maintenance Costs &amp; Travel Logs</span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <div class="o_isg_seg_tabs mb-0">
+                                    <button type="button"
+                                        t-attf-class="o_isg_seg_tab {{ state.fleetMgr.period === 'month' ? 'active' : '' }}"
+                                        t-on-click="() => this.setFleetPeriod('month')">This Month</button>
+                                    <button type="button"
+                                        t-attf-class="o_isg_seg_tab {{ state.fleetMgr.period === '6m' ? 'active' : '' }}"
+                                        t-on-click="() => this.setFleetPeriod('6m')">6 Months</button>
+                                    <button type="button"
+                                        t-attf-class="o_isg_seg_tab {{ state.fleetMgr.period === 'all' ? 'active' : '' }}"
+                                        t-on-click="() => this.setFleetPeriod('all')">All Time</button>
+                                </div>
+                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.newVehicle()">
+                                    <i class="fa fa-plus me-1"/>Add Vehicle
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleFleetManager(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4-Column Fleet P&L Summary Strip -->
+                        <div class="o_isg_stock_summary_strip">
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Vehicle Income (<t t-out="fleetPeriodLabel"/>)</span>
+                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_green">
+                                    <t t-out="fmt(fleetSummary.income)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="fleetSummary.tripsCount"/> travels · <t t-out="fmt(fleetSummary.distanceKm)"/> km logged
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Maintenance &amp; Repairs</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(fleetSummary.maintenance)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="fleetSummary.servicesCount"/> service logs recorded
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Fuel &amp; Road Costs</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(fleetSummary.tripCost)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    Fuel <t t-out="fmt(fleetSummary.fuelCost)"/> · Other <t t-out="fmt(fleetSummary.otherCost)"/>
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Fleet Net Profit</span>
+                                <div t-attf-class="o_isg_stock_stat_val o_isg_num {{ fleetSummary.net &lt; 0 ? 'o_isg_c_rose' : (fleetSummary.net &gt; 0 ? 'o_isg_c_green' : '') }}">
+                                    <t t-if="fleetSummary.net &gt; 0">+</t><t t-out="fmt(fleetSummary.net)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    Income less maintenance &amp; trip costs (<t t-out="fleetSummary.marginPct"/>%)
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="o_isg_fleet_split">
+                            <!-- LEFT: Vehicle Roster with instant per-vehicle Income / Maintenance / Travels -->
+                            <div class="o_isg_stock_list_pane">
+                                <div class="o_isg_stock_toolbar">
+                                    <div class="o_isg_search_field">
+                                        <i class="fa fa-search"/>
+                                        <input type="text"
+                                            placeholder="Search plate, model or driver..."
+                                            t-att-value="state.fleetMgr.search"
+                                            t-on-input="(ev) => { state.fleetMgr.search = ev.target.value; }"/>
+                                    </div>
+                                    <span class="o_isg_muted small o_isg_num"><t t-out="filteredFleetVehicles.length"/> vehicles</span>
+                                </div>
+
+                                <div class="o_isg_fleet_list">
+                                    <t t-foreach="filteredFleetVehicles" t-as="v" t-key="v.id">
+                                        <div t-attf-class="o_isg_fleet_row {{ selectedFleetVehicle and selectedFleetVehicle.id === v.id ? 'is_selected' : '' }}"
+                                            role="button" tabindex="0"
+                                            t-on-click="() => this.selectFleetVehicle(v)"
+                                            t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.selectFleetVehicle(v))">
+                                            <div class="o_isg_fleet_row_top">
+                                                <div class="o_isg_fleet_row_id">
+                                                    <span class="o_isg_plate"><t t-out="v.plate"/></span>
+                                                    <span t-if="v.activeTripsCount &gt; 0" class="o_isg_status_badge o_isg_status_amber">
+                                                        <i class="o_isg_status_dot"/>On Road
+                                                    </span>
+                                                </div>
+                                                <div t-attf-class="o_isg_fleet_net o_isg_num {{ v.net &gt; 0 ? 'o_isg_c_green' : (v.net &lt; 0 ? 'o_isg_c_rose' : 'o_isg_muted') }}">
+                                                    <t t-if="v.net &gt; 0">+</t><t t-out="fmt(v.net)"/> <small><t t-out="state.currency"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="o_isg_fleet_row_title"><t t-out="v.name"/></div>
+                                            <div class="o_isg_muted small o_isg_fleet_row_sub">
+                                                <span><i class="fa fa-user-o me-1"/><t t-out="v.driver"/></span>
+                                                <span class="o_isg_num"><t t-out="fmt(v.odometer)"/> <t t-out="v.odometerUnit"/></span>
+                                            </div>
+                                            <div class="o_isg_fleet_row_metrics o_isg_num">
+                                                <div class="o_isg_fl_m">
+                                                    <span>Income</span>
+                                                    <strong class="o_isg_c_green"><t t-out="fmt(v.income)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_m">
+                                                    <span>Maint.</span>
+                                                    <strong t-attf-class="{{ v.maintenance &gt; 0 ? 'o_isg_c_amber' : '' }}"><t t-out="fmt(v.maintenance)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_m">
+                                                    <span>Fuel/Trip</span>
+                                                    <strong><t t-out="fmt(v.tripCost)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_m">
+                                                    <span>Travels</span>
+                                                    <strong><t t-out="v.tripsCount"/> · <t t-out="fmt(v.distanceKm)"/>km</strong>
+                                                </div>
+                                            </div>
+                                            <div t-if="v.income &gt; 0 or v.totalCost &gt; 0" class="o_isg_fl_ratio">
+                                                <div class="o_isg_fl_ratio_inc" t-attf-style="width: {{ v.incomeBarPct }}%"/>
+                                                <div class="o_isg_fl_ratio_cost">
+                                                    <div class="o_isg_fl_ratio_maint" t-attf-style="width: {{ v.maintBarPct }}%"/>
+                                                    <div class="o_isg_fl_ratio_fuel" t-attf-style="width: {{ v.fuelBarPct }}%"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                    <div t-if="!filteredFleetVehicles.length" class="o_isg_empty o_isg_empty_sm">
+                                        <div>No vehicles match this search</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT: Selected Vehicle Detail Panel (Travels, Maintenance, P&L) -->
+                            <div class="o_isg_stock_panel_pane">
+                                <t t-set="veh" t-value="selectedFleetVehicle"/>
+                                <t t-if="veh">
+                                    <div class="o_isg_adj_head">
+                                        <span class="o_isg_vehicle_icon o_isg_fl_head_icon"><i class="fa fa-truck"/></span>
+                                        <div class="o_isg_adj_head_main">
+                                            <div class="o_isg_fl_head_title">
+                                                <span class="o_isg_plate"><t t-out="veh.plate"/></span>
+                                                <span class="o_isg_adj_name"><t t-out="veh.name"/></span>
+                                            </div>
+                                            <div class="o_isg_muted small">
+                                                <t t-out="veh.driver"/> · <span class="o_isg_num"><t t-out="fmt(veh.odometer)"/> <t t-out="veh.odometerUnit"/></span>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openRecord('fleet.vehicle', veh.id)" title="Open full vehicle record">
+                                            <i class="fa fa-external-link me-1"/>Fleet Card
+                                        </button>
+                                    </div>
+
+                                    <!-- 4 Per-Vehicle KPI Tiles -->
+                                    <div class="o_isg_fl_kpis">
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Income</span>
+                                            <strong class="o_isg_num o_isg_c_green"><t t-out="fmt(veh.income)"/></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Maintenance</span>
+                                            <strong t-attf-class="o_isg_num {{ veh.maintenance &gt; 0 ? 'o_isg_c_amber' : '' }}"><t t-out="fmt(veh.maintenance)"/></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Fuel &amp; Road</span>
+                                            <strong class="o_isg_num"><t t-out="fmt(veh.tripCost)"/></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Net Profit</span>
+                                            <strong t-attf-class="o_isg_num {{ veh.net &gt; 0 ? 'o_isg_c_green' : (veh.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
+                                                <t t-if="veh.net &gt; 0">+</t><t t-out="fmt(veh.net)"/>
+                                            </strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Panel Tabs -->
+                                    <div class="o_isg_adj_tabs o_isg_fl_tabs_bar">
+                                        <div class="o_isg_fl_tabs_left">
+                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'travels' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('travels')">
+                                                Travels <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleTrips.length"/></span>
+                                            </button>
+                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'maintenance' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('maintenance')">
+                                                Maintenance <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleServices.length"/></span>
+                                            </button>
+                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'pnl' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('pnl')">
+                                                P&amp;L Summary
+                                            </button>
+                                        </div>
+                                        <div class="o_isg_fl_tabs_actions">
+                                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.openNewTripForm()">
+                                                <i class="fa fa-plus me-1"/>Log Travel
+                                            </button>
+                                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openNewServiceForm()">
+                                                <i class="fa fa-wrench me-1"/>Log Maint.
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- TAB 1: TRAVELS -->
+                                    <t t-if="state.fleetMgr.tab === 'travels'">
+                                        <div class="o_isg_adj_body">
+                                            <!-- Inline Quick Log Travel Form -->
+                                            <t t-if="state.fleetMgr.showNewTrip">
+                                                <div class="o_isg_fl_form">
+                                                    <div class="o_isg_fl_form_head">
+                                                        <strong>Record Travel for <t t-out="veh.plate"/></strong>
+                                                        <button type="button" class="o_isg_text_btn" t-on-click="() => { state.fleetMgr.showNewTrip = false; }">Cancel</button>
+                                                    </div>
+                                                    <div class="o_isg_adj_reasons">
+                                                        <t t-foreach="tripTypePills" t-as="tp" t-key="tp.key">
+                                                            <button type="button"
+                                                                t-attf-class="o_isg_cust_pill {{ state.fleetMgr.tripType === tp.key ? 'active' : '' }}"
+                                                                t-on-click="() => this.setTripType(tp.key)">
+                                                                <t t-out="tp.label"/>
+                                                            </button>
+                                                        </t>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_2">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Destination *</span>
+                                                            <input type="text" class="o_isg_field"
+                                                                placeholder="e.g. Kimironko Construction Site"
+                                                                t-att-value="state.fleetMgr.tripDestination"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripDestination = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Origin</span>
+                                                            <input type="text" class="o_isg_field"
+                                                                placeholder="Isange Hardware Store"
+                                                                t-att-value="state.fleetMgr.tripOrigin"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripOrigin = ev.target.value; }"/>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_2">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Driver</span>
+                                                            <select class="o_isg_field" t-on-change="(ev) => this.setTripDriverId(ev.target.value)">
+                                                                <t t-foreach="state.fleetMgr.drivers" t-as="drv" t-key="drv.id">
+                                                                    <option t-att-value="drv.id" t-att-selected="state.fleetMgr.tripDriverId === drv.id">
+                                                                        <t t-out="drv.name"/>
+                                                                    </option>
+                                                                </t>
+                                                            </select>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Cargo / Load <span class="o_isg_muted">(optional)</span></span>
+                                                            <input type="text" class="o_isg_field"
+                                                                placeholder="e.g. 80 bags cement"
+                                                                t-att-value="state.fleetMgr.tripCargo"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripCargo = ev.target.value; }"/>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_4">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Income / Fee (<t t-out="state.currency"/>)</span>
+                                                            <input type="number" min="0" step="1000" class="o_isg_field o_isg_num"
+                                                                placeholder="0"
+                                                                t-att-value="state.fleetMgr.tripFee"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripFee = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Fuel Cost</span>
+                                                            <input type="number" min="0" step="1000" class="o_isg_field o_isg_num"
+                                                                placeholder="0"
+                                                                t-att-value="state.fleetMgr.tripFuelCost"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripFuelCost = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Other Cost</span>
+                                                            <input type="number" min="0" step="500" class="o_isg_field o_isg_num"
+                                                                placeholder="0"
+                                                                t-att-value="state.fleetMgr.tripOtherCost"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripOtherCost = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Distance (km)</span>
+                                                            <input type="number" min="0" step="1" class="o_isg_field o_isg_num"
+                                                                placeholder="0"
+                                                                t-att-value="state.fleetMgr.tripDistance"
+                                                                t-on-input="(ev) => { state.fleetMgr.tripDistance = ev.target.value; }"/>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_form_foot">
+                                                        <div class="o_isg_seg_tabs mb-0">
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.tripState === 'completed' ? 'active' : '' }}" t-on-click="() => this.setTripState('completed')">Completed</button>
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.tripState === 'in_transit' ? 'active' : '' }}" t-on-click="() => this.setTripState('in_transit')">On Road</button>
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.tripState === 'planned' ? 'active' : '' }}" t-on-click="() => this.setTripState('planned')">Planned</button>
+                                                        </div>
+                                                        <div class="o_isg_fl_form_preview o_isg_num">
+                                                            <span>Trip Net: </span>
+                                                            <strong t-attf-class="{{ newTripCalc.net &gt; 0 ? 'o_isg_c_green' : (newTripCalc.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
+                                                                <t t-if="newTripCalc.net &gt; 0">+</t><t t-out="fmt(newTripCalc.net)"/> <t t-out="state.currency"/>
+                                                            </strong>
+                                                        </div>
+                                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                                            t-att-disabled="state.fleetMgr.busy"
+                                                            t-on-click="() => this.saveQuickTrip()">
+                                                            <i t-attf-class="fa {{ state.fleetMgr.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>Save Travel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </t>
+
+                                            <t t-if="selectedVehicleTrips.length">
+                                                <div class="o_isg_fl_feed">
+                                                    <t t-foreach="selectedVehicleTrips" t-as="tr" t-key="tr.id">
+                                                        <div class="o_isg_fl_card">
+                                                            <div class="o_isg_fl_card_top">
+                                                                <div class="o_isg_fl_card_meta">
+                                                                    <span class="o_isg_mono"><t t-out="tr.name"/></span>
+                                                                    <span class="o_isg_muted small o_isg_num"><t t-out="tr.shortDate"/></span>
+                                                                    <span t-attf-class="o_isg_status_badge o_isg_status_trip_{{ tr.state }}">
+                                                                        <i class="o_isg_status_dot"/><t t-out="tr.stateLabel"/>
+                                                                    </span>
+                                                                </div>
+                                                                <div class="o_isg_fl_card_actions">
+                                                                    <button t-if="tr.state === 'planned'" type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                                        t-att-disabled="state.fleetMgr.busy"
+                                                                        t-on-click="() => this.advanceTripState(tr.id, 'start')">Start</button>
+                                                                    <button t-if="tr.state === 'planned' or tr.state === 'in_transit'" type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                                                        t-att-disabled="state.fleetMgr.busy"
+                                                                        t-on-click="() => this.advanceTripState(tr.id, 'complete')">Complete</button>
+                                                                    <button type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('isange.vehicle.trip', tr.id)">Open</button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="o_isg_fl_route">
+                                                                <span><t t-out="tr.origin"/></span>
+                                                                <i class="fa fa-long-arrow-right o_isg_muted"/>
+                                                                <strong><t t-out="tr.destination"/></strong>
+                                                            </div>
+                                                            <div class="o_isg_muted small">
+                                                                <t t-out="tr.type"/> · <t t-out="tr.driver"/>
+                                                                <t t-if="tr.distance &gt; 0"> · <span class="o_isg_num"><t t-out="fmt(tr.distance)"/> km</span></t>
+                                                                <t t-if="tr.cargo"> · <t t-out="tr.cargo"/></t>
+                                                            </div>
+                                                            <div class="o_isg_fl_card_fin o_isg_num">
+                                                                <span>Income <strong class="o_isg_c_green"><t t-out="fmt(tr.fee)"/></strong></span>
+                                                                <span>Fuel <strong><t t-out="fmt(tr.fuelCost)"/></strong></span>
+                                                                <span t-if="tr.otherCost &gt; 0">Other <strong><t t-out="fmt(tr.otherCost)"/></strong></span>
+                                                                <span class="o_isg_fl_card_net">
+                                                                    Net <strong t-attf-class="{{ tr.net &gt; 0 ? 'o_isg_c_green' : (tr.net &lt; 0 ? 'o_isg_c_rose' : '') }}"><t t-if="tr.net &gt; 0">+</t><t t-out="fmt(tr.net)"/> <t t-out="state.currency"/></strong>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="o_isg_empty o_isg_empty_sm">
+                                                    <div>No travels logged for <t t-out="veh.plate"/> (<t t-out="fleetPeriodLabel"/>)</div>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs mt-2" t-on-click="() => this.openNewTripForm()">
+                                                        <i class="fa fa-plus me-1"/>Log First Travel
+                                                    </button>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+
+                                    <!-- TAB 2: MAINTENANCE -->
+                                    <t t-if="state.fleetMgr.tab === 'maintenance'">
+                                        <div class="o_isg_adj_body">
+                                            <!-- Inline Quick Log Maintenance Form -->
+                                            <t t-if="state.fleetMgr.showNewService">
+                                                <div class="o_isg_fl_form">
+                                                    <div class="o_isg_fl_form_head">
+                                                        <strong>Log Maintenance Cost for <t t-out="veh.plate"/></strong>
+                                                        <button type="button" class="o_isg_text_btn" t-on-click="() => { state.fleetMgr.showNewService = false; }">Cancel</button>
+                                                    </div>
+                                                    <div class="o_isg_adj_reasons">
+                                                        <t t-foreach="state.fleetMgr.serviceTypes" t-as="st" t-key="st.id">
+                                                            <button type="button"
+                                                                t-attf-class="o_isg_cust_pill {{ state.fleetMgr.svcTypeId === st.id ? 'active' : '' }}"
+                                                                t-on-click="() => this.setSvcTypeId(st.id)">
+                                                                <t t-out="st.name"/>
+                                                            </button>
+                                                        </t>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_3">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Cost (<t t-out="state.currency"/>) *</span>
+                                                            <input type="number" min="0" step="1000" class="o_isg_field o_isg_num"
+                                                                placeholder="e.g. 45000"
+                                                                t-att-value="state.fleetMgr.svcAmount"
+                                                                t-on-input="(ev) => { state.fleetMgr.svcAmount = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Service Date</span>
+                                                            <input type="date" class="o_isg_field o_isg_num"
+                                                                t-att-value="state.fleetMgr.svcDate"
+                                                                t-on-input="(ev) => { state.fleetMgr.svcDate = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Odometer (<t t-out="veh.odometerUnit"/>)</span>
+                                                            <input type="number" min="0" step="1" class="o_isg_field o_isg_num"
+                                                                t-att-value="state.fleetMgr.svcOdometer"
+                                                                t-on-input="(ev) => { state.fleetMgr.svcOdometer = ev.target.value; }"/>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_2">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Work Done / Details</span>
+                                                            <input type="text" class="o_isg_field"
+                                                                placeholder="e.g. Engine oil + filter &amp; front brake pads"
+                                                                t-att-value="state.fleetMgr.svcDescription"
+                                                                t-on-input="(ev) => { state.fleetMgr.svcDescription = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Garage / Vendor <span class="o_isg_muted">(optional)</span></span>
+                                                            <select class="o_isg_field" t-on-change="(ev) => this.setSvcVendorId(ev.target.value)">
+                                                                <option value="">— No vendor selected —</option>
+                                                                <t t-foreach="state.stockMgr.suppliers" t-as="sup" t-key="sup.id">
+                                                                    <option t-att-value="sup.id" t-att-selected="state.fleetMgr.svcVendorId === sup.id">
+                                                                        <t t-out="sup.shortName"/>
+                                                                    </option>
+                                                                </t>
+                                                            </select>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_form_foot">
+                                                        <div class="o_isg_seg_tabs mb-0">
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.svcState === 'done' ? 'active' : '' }}" t-on-click="() => this.setSvcState('done')">Completed</button>
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.svcState === 'running' ? 'active' : '' }}" t-on-click="() => this.setSvcState('running')">In Progress</button>
+                                                            <button type="button" t-attf-class="o_isg_seg_tab {{ state.fleetMgr.svcState === 'new' ? 'active' : '' }}" t-on-click="() => this.setSvcState('new')">Scheduled</button>
+                                                        </div>
+                                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                                            t-att-disabled="state.fleetMgr.busy"
+                                                            t-on-click="() => this.saveQuickService()">
+                                                            <i t-attf-class="fa {{ state.fleetMgr.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>Save Maintenance
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </t>
+
+                                            <!-- Category Breakdown Strip -->
+                                            <div t-if="selectedVehicleMaintByType.length" class="o_isg_fl_cat_bar">
+                                                <t t-foreach="selectedVehicleMaintByType" t-as="mc" t-key="mc.name">
+                                                    <span class="o_isg_fl_cat_pill o_isg_num">
+                                                        <span><t t-out="mc.name"/></span>
+                                                        <strong><t t-out="fmt(mc.amount)"/></strong>
+                                                        <small><t t-out="mc.pct"/>%</small>
+                                                    </span>
+                                                </t>
+                                            </div>
+
+                                            <t t-if="selectedVehicleServices.length">
+                                                <div class="o_isg_fl_feed">
+                                                    <t t-foreach="selectedVehicleServices" t-as="sv" t-key="sv.id">
+                                                        <div class="o_isg_fl_card">
+                                                            <div class="o_isg_fl_card_top">
+                                                                <div class="o_isg_fl_card_meta">
+                                                                    <strong class="o_isg_person_name"><t t-out="sv.serviceType"/></strong>
+                                                                    <span class="o_isg_muted small o_isg_num"><t t-out="sv.date"/></span>
+                                                                    <span t-attf-class="o_isg_status_badge {{ sv.state === 'done' ? 'o_isg_status_emerald' : (sv.state === 'running' ? 'o_isg_status_amber' : 'o_isg_status_slate') }}">
+                                                                        <i class="o_isg_status_dot"/><t t-out="sv.stateLabel"/>
+                                                                    </span>
+                                                                </div>
+                                                                <div class="o_isg_fl_card_actions">
+                                                                    <strong class="o_isg_num o_isg_c_amber"><t t-out="fmt(sv.amount)"/> <small class="o_isg_muted"><t t-out="state.currency"/></small></strong>
+                                                                    <button t-if="sv.state === 'new' or sv.state === 'running'" type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                                        t-att-disabled="state.fleetMgr.busy"
+                                                                        t-on-click="() => this.completeServiceLog(sv.id)">Done</button>
+                                                                    <button type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('fleet.vehicle.log.services', sv.id)">Open</button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="o_isg_muted small">
+                                                                <t t-if="sv.description"><t t-out="sv.description"/></t>
+                                                                <t t-elif="sv.notes"><t t-out="sv.notes"/></t>
+                                                                <t t-else="">Standard vehicle service log</t>
+                                                                <t t-if="sv.vendor"> · Garage: <t t-out="sv.vendor"/></t>
+                                                                <t t-if="sv.odometer &gt; 0"> · <span class="o_isg_num"><t t-out="fmt(sv.odometer)"/> <t t-out="veh.odometerUnit"/></span></t>
+                                                            </div>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="o_isg_empty o_isg_empty_sm">
+                                                    <div>No maintenance or repair costs recorded for <t t-out="veh.plate"/> (<t t-out="fleetPeriodLabel"/>)</div>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs mt-2" t-on-click="() => this.openNewServiceForm()">
+                                                        <i class="fa fa-wrench me-1"/>Log Maintenance Cost
+                                                    </button>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+
+                                    <!-- TAB 3: P&L SUMMARY -->
+                                    <t t-if="state.fleetMgr.tab === 'pnl'">
+                                        <div class="o_isg_adj_body">
+                                            <div class="o_isg_fl_pnl_card">
+                                                <div class="o_isg_fl_pnl_title">
+                                                    <span>Vehicle Profit &amp; Loss</span>
+                                                    <span class="o_isg_muted small"><t t-out="fleetPeriodLabel"/> · <t t-out="state.currency"/></span>
+                                                </div>
+                                                <div class="o_isg_fl_pnl_row">
+                                                    <span>Travel &amp; Delivery Income (<t t-out="veh.tripsCount"/> travels)</span>
+                                                    <strong class="o_isg_num o_isg_c_green">+<t t-out="fmt(veh.income)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_pnl_row">
+                                                    <span>Fuel Costs</span>
+                                                    <strong class="o_isg_num">−<t t-out="fmt(veh.fuelCost)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_pnl_row">
+                                                    <span>Road, Offloading &amp; Other Trip Costs</span>
+                                                    <strong class="o_isg_num">−<t t-out="fmt(veh.otherCost)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_pnl_row">
+                                                    <span>Maintenance &amp; Repair Logs (<t t-out="veh.servicesCount"/> services)</span>
+                                                    <strong class="o_isg_num o_isg_c_amber">−<t t-out="fmt(veh.maintenance)"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_pnl_total">
+                                                    <span>Net Vehicle Profit</span>
+                                                    <strong t-attf-class="o_isg_num {{ veh.net &gt; 0 ? 'o_isg_c_green' : (veh.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
+                                                        <t t-if="veh.net &gt; 0">+</t><t t-out="fmt(veh.net)"/> <small><t t-out="state.currency"/></small>
+                                                    </strong>
+                                                </div>
+                                            </div>
+
+                                            <div class="o_isg_fl_eff_grid o_isg_num">
+                                                <div class="o_isg_fl_eff_item">
+                                                    <span>Distance Logged</span>
+                                                    <strong><t t-out="fmt(veh.distanceKm)"/> <t t-out="veh.odometerUnit"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_eff_item">
+                                                    <span>Avg Income / Trip</span>
+                                                    <strong><t t-out="fmt(veh.avgIncomePerTrip)"/> <t t-out="state.currency"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_eff_item">
+                                                    <span>Total Cost / km</span>
+                                                    <strong><t t-out="fmt(veh.costPerKm)"/> <t t-out="state.currency"/></strong>
+                                                </div>
+                                                <div class="o_isg_fl_eff_item">
+                                                    <span>Profit Margin</span>
+                                                    <strong><t t-out="pct(veh.net, veh.income)"/>%</strong>
+                                                </div>
+                                            </div>
+
+                                            <div t-if="veh.totalCost &gt; 0" class="o_isg_fl_cost_share">
+                                                <div class="o_isg_fl_cost_share_head">
+                                                    <span>Expense Breakdown</span>
+                                                    <span class="o_isg_num o_isg_muted">Total <t t-out="fmt(veh.totalCost)"/> <t t-out="state.currency"/></span>
+                                                </div>
+                                                <div class="o_isg_fl_share_bar">
+                                                    <div class="o_isg_fl_share_fuel" t-attf-style="width: {{ pct(veh.fuelCost, veh.totalCost) }}%" title="Fuel"/>
+                                                    <div class="o_isg_fl_share_other" t-attf-style="width: {{ pct(veh.otherCost, veh.totalCost) }}%" title="Other Trip Cost"/>
+                                                    <div class="o_isg_fl_share_maint" t-attf-style="width: {{ pct(veh.maintenance, veh.totalCost) }}%" title="Maintenance"/>
+                                                </div>
+                                                <div class="o_isg_fl_share_legend o_isg_num">
+                                                    <span><i class="o_isg_dot o_isg_dot_blue"/>Fuel <t t-out="pct(veh.fuelCost, veh.totalCost)"/>%</span>
+                                                    <span><i class="o_isg_dot o_isg_dot_indigo"/>Other <t t-out="pct(veh.otherCost, veh.totalCost)"/>%</span>
+                                                    <span><i class="o_isg_dot o_isg_dot_amber"/>Maintenance <t t-out="pct(veh.maintenance, veh.totalCost)"/>%</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Quick Odometer Update & Native Links -->
+                                            <div class="o_isg_fl_odo_bar">
+                                                <span class="o_isg_muted small">Current Odometer (<t t-out="veh.odometerUnit"/>)</span>
+                                                <div class="o_isg_fl_odo_inputs">
+                                                    <input type="number" min="0" step="1" class="o_isg_field o_isg_field_sm o_isg_num"
+                                                        t-att-value="state.fleetMgr.editOdo"
+                                                        t-on-input="(ev) => { state.fleetMgr.editOdo = ev.target.value; }"/>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                        t-att-disabled="state.fleetMgr.busy"
+                                                        t-on-click="() => this.saveVehicleOdometer()">Update</button>
+                                                    <button type="button" class="o_isg_text_btn" t-on-click="() => this.openVehicleTrips(veh.id)">All Trips</button>
+                                                    <button type="button" class="o_isg_text_btn" t-on-click="() => this.openFleetServices(veh.id)">All Services</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <div class="o_isg_adj_empty">
+                                        <i class="fa fa-truck"/>
+                                        <div class="o_isg_adj_empty_title">No vehicles registered yet</div>
+                                        <div class="o_isg_muted">Add your company trucks or pickups to track income, maintenance costs, and travels.</div>
+                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs mt-2" t-on-click="() => this.newVehicle()">Add Vehicle</button>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </section>
+                </t>
+
+                <!-- ============ FINANCIAL KPI STRIP ============ -->
+                <div class="o_isg_kpis">
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.openSales()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openSales())">
+                        <div class="o_isg_kpi_head">
+                            <span class="o_isg_kpi_label">Hardware Revenue</span>
+                            <span class="o_isg_kpi_badge">MTD</span>
+                        </div>
+                        <div class="o_isg_kpi_metric o_isg_num">
+                            <t t-out="fmtShort(state.kpi.salesMonth)"/>
+                            <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
+                        </div>
+                        <div class="o_isg_kpi_meta">
+                            <span class="o_isg_meta_accent o_isg_c_blue"><t t-out="state.kpi.salesCount"/> confirmed orders</span>
+                            <span>Sales &amp; POS</span>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.toggleStockManager()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleStockManager())">
+                        <div class="o_isg_kpi_head">
+                            <span class="o_isg_kpi_label">Inventory &amp; Stock Value</span>
+                            <span t-attf-class="o_isg_kpi_badge {{ state.stockMgr.lowCount + state.stockMgr.outCount ? 'is_alert' : '' }}">
+                                <t t-if="state.stockMgr.lowCount + state.stockMgr.outCount">
+                                    <t t-out="state.stockMgr.lowCount + state.stockMgr.outCount"/> low stock
+                                </t>
+                                <t t-else="">All stocked</t>
+                            </span>
+                        </div>
+                        <div class="o_isg_kpi_metric o_isg_num">
+                            <t t-out="fmtShort(state.stockMgr.costValuation)"/>
+                            <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
+                        </div>
+                        <div class="o_isg_kpi_meta">
+                            <span class="o_isg_num"><t t-out="fmt(state.stockMgr.totalUnitsOnHand)"/> units on hand</span>
+                            <span class="o_isg_c_blue">Manage Stock →</span>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.openUnits()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openUnits())">
+                        <div class="o_isg_kpi_head">
+                            <span class="o_isg_kpi_label">Contracted Rent Roll</span>
+                            <span class="o_isg_kpi_badge">Monthly</span>
+                        </div>
+                        <div class="o_isg_kpi_metric o_isg_num">
+                            <t t-out="fmtShort(state.kpi.rentRoll)"/>
+                            <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
+                        </div>
+                        <div class="o_isg_kpi_meta">
+                            <span>of <strong class="o_isg_num"><t t-out="fmtShort(state.kpi.potentialRent)"/> <t t-out="state.currency"/></strong> capacity</span>
+                            <span class="o_isg_num"><t t-out="pct(state.kpi.rentRoll, state.kpi.potentialRent)"/>%</span>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.openOutstandingRent()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openOutstandingRent())">
+                        <div class="o_isg_kpi_head">
+                            <span class="o_isg_kpi_label">Rent Receivables</span>
+                            <span t-attf-class="o_isg_kpi_badge {{ state.kpi.overdueCount ? 'is_alert' : '' }}">
+                                <t t-out="state.kpi.overdueCount"/> overdue
+                            </span>
+                        </div>
+                        <div class="o_isg_kpi_metric o_isg_num">
+                            <t t-out="fmtShort(state.kpi.outstandingRent)"/>
+                            <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
+                        </div>
+                        <div class="o_isg_kpi_meta">
+                            <span>Open tenant balances</span>
+                            <i class="fa fa-angle-right"/>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.toggleFleetManager(true)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleFleetManager(true))">
+                        <div class="o_isg_kpi_head">
+                            <span class="o_isg_kpi_label">Fleet Net Contribution</span>
+                            <span t-attf-class="o_isg_kpi_badge {{ state.kpi.fleetNet &lt; 0 ? 'is_alert' : '' }}">
+                                <t t-out="state.kpi.tripsMonth"/> trips
+                            </span>
+                        </div>
+                        <div t-attf-class="o_isg_kpi_metric o_isg_num {{ state.kpi.fleetNet &lt; 0 ? 'is_negative' : '' }}">
+                            <t t-out="fmtShort(state.kpi.fleetNet)"/>
+                            <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
+                        </div>
+                        <div class="o_isg_kpi_meta">
+                            <span class="o_isg_num"><t t-out="fmt(state.kpi.distanceMonth)"/> km · Maint <t t-out="fmtShort(state.kpi.maintMonth)"/></span>
+                            <span class="o_isg_c_blue">Manage Fleet →</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============ COMMERCIAL BUILDING MATRIX & PORTFOLIO METRICS ============ -->
+                <div class="o_isg_grid o_isg_grid_2_1">
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Commercial Building Stacking Plan</div>
+                                <div class="o_isg_card_sub">Floor-by-floor occupancy and unit lease status</div>
+                            </div>
+                            <div class="o_isg_legend">
+                                <span><i class="o_isg_dot o_isg_dot_emerald"/>Occupied</span>
+                                <span><i class="o_isg_dot o_isg_dot_blue"/>Available</span>
+                                <span><i class="o_isg_dot o_isg_dot_amber"/>Maintenance</span>
+                            </div>
+                        </div>
+
+                        <t t-if="state.floors.length">
+                            <div class="o_isg_building">
+                                <t t-foreach="state.floors" t-as="floor" t-key="floor.name">
+                                    <div class="o_isg_floor">
+                                        <div class="o_isg_floor_label">
+                                            <div class="o_isg_floor_name"><t t-out="floor.name"/></div>
+                                            <div class="o_isg_floor_meta o_isg_num">
+                                                <t t-out="floor.occupied"/> of <t t-out="floor.units.length"/> leased
+                                            </div>
+                                            <div class="o_isg_floor_bar">
+                                                <div class="o_isg_floor_bar_fill" t-attf-style="width: {{ pct(floor.occupied, floor.units.length) }}%"/>
+                                            </div>
+                                        </div>
+                                        <div class="o_isg_floor_units">
+                                            <t t-foreach="floor.units" t-as="u" t-key="u.id">
+                                                <div t-attf-class="o_isg_unit o_isg_unit_{{ u.state }}"
+                                                    role="button" tabindex="0"
+                                                    t-on-click="() => this.openRecord('isange.property', u.id)"
+                                                    t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openRecord('isange.property', u.id))"
+                                                    t-att-title="u.name">
+                                                    <div class="o_isg_unit_top">
+                                                        <span class="o_isg_unit_code"><t t-out="u.code or '—'"/></span>
+                                                        <span t-attf-class="o_isg_status_badge o_isg_status_unit_{{ u.state }}">
+                                                            <i class="o_isg_status_dot"/>
+                                                            <t t-out="u.stateLabel"/>
+                                                        </span>
+                                                    </div>
+                                                    <div class="o_isg_unit_name"><t t-out="u.name"/></div>
+                                                    <div class="o_isg_unit_rent o_isg_num">
+                                                        <t t-out="fmt(u.rent)"/> <small><t t-out="state.currency"/>/mo</small>
+                                                    </div>
+                                                    <div class="o_isg_unit_tenant">
+                                                        <t t-if="u.tenant"><t t-out="u.tenant"/></t>
+                                                        <t t-else=""><span class="o_isg_muted">Available · <t t-out="fmt(u.area)"/> m²</span></t>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="o_isg_empty">
+                                <div>No commercial units configured</div>
+                                <button type="button" class="o_isg_btn o_isg_btn_cta mt-2" t-on-click="() => this.newUnit()">Add Unit</button>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div class="o_isg_stack">
+                        <div class="o_isg_card">
+                            <div class="o_isg_card_head mb-2">
+                                <div>
+                                    <div class="o_isg_card_title">Portfolio Occupancy</div>
+                                    <div class="o_isg_card_sub">Active commercial leases</div>
+                                </div>
+                                <span class="o_isg_kpi_badge o_isg_num"><t t-out="state.kpi.occupiedUnits"/>/<t t-out="state.kpi.totalUnits"/> units</span>
+                            </div>
+
+                            <div class="o_isg_gauge_row">
+                                <div class="o_isg_svg_gauge">
+                                    <svg viewBox="0 0 36 36" class="o_isg_donut_svg">
+                                        <circle class="o_isg_donut_track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.2"/>
+                                        <circle class="o_isg_donut_seg_emerald" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.2"
+                                            stroke-linecap="round"
+                                            t-att-stroke-dasharray="occupancyDash"
+                                            stroke-dashoffset="25"/>
+                                    </svg>
+                                    <div class="o_isg_gauge_center">
+                                        <div class="o_isg_gauge_val o_isg_num"><t t-out="state.kpi.occupancyPct"/>%</div>
+                                        <div class="o_isg_gauge_lbl">Leased</div>
+                                    </div>
+                                </div>
+
+                                <div class="o_isg_gauge_metrics">
+                                    <div class="o_isg_g_item">
+                                        <span class="o_isg_g_lbl"><i class="o_isg_dot o_isg_dot_emerald"/>Occupied</span>
+                                        <strong class="o_isg_num"><t t-out="state.kpi.occupiedUnits"/></strong>
+                                    </div>
+                                    <div class="o_isg_g_item">
+                                        <span class="o_isg_g_lbl"><i class="o_isg_dot o_isg_dot_blue"/>Not rented</span>
+                                        <strong class="o_isg_num"><t t-out="state.kpi.totalUnits - state.kpi.occupiedUnits"/></strong>
+                                    </div>
+                                    <div class="o_isg_g_item">
+                                        <span class="o_isg_g_lbl">Leased Floor Area</span>
+                                        <strong class="o_isg_num"><t t-out="fmt(state.kpi.occupiedArea)"/> m²</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="o_isg_card">
+                            <div class="o_isg_card_head mb-1">
+                                <div>
+                                    <div class="o_isg_card_title">Building Net Operating Income</div>
+                                    <div class="o_isg_card_sub">Posted rent invoices less approved repairs</div>
+                                </div>
+                            </div>
+                            <div t-attf-class="o_isg_noi_value o_isg_num {{ state.kpi.buildingProfit &lt; 0 ? 'is_negative' : '' }}">
+                                <t t-out="fmt(state.kpi.buildingProfit)"/> <small><t t-out="state.currency"/></small>
+                            </div>
+                            <div class="o_isg_progress mt-3">
+                                <div class="o_isg_progress_bar" t-attf-style="width: {{ pct(state.kpi.rentRoll, state.kpi.potentialRent) }}%"/>
+                            </div>
+                            <div class="o_isg_progress_caption">
+                                <span>Rent capture vs gross potential</span>
+                                <strong class="o_isg_num"><t t-out="pct(state.kpi.rentRoll, state.kpi.potentialRent)"/>%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============ REVENUE TREND & REVENUE MIX ============ -->
+                <div class="o_isg_grid o_isg_grid_2_1">
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Revenue Performance (6 Months)</div>
+                                <div class="o_isg_card_sub">Consolidated inflow by business line (<t t-out="state.currency"/>)</div>
+                            </div>
+                            <div class="o_isg_legend">
+                                <span><i class="o_isg_dot o_isg_dot_blue"/>Hardware</span>
+                                <span><i class="o_isg_dot o_isg_dot_indigo"/>Building Rent</span>
+                                <span><i class="o_isg_dot o_isg_dot_amber"/>Fleet Delivery</span>
+                            </div>
+                        </div>
+                        <div class="o_isg_chart">
+                            <t t-foreach="state.trend" t-as="m" t-key="m.key">
+                                <div class="o_isg_chart_col">
+                                    <div class="o_isg_chart_value o_isg_num"><t t-out="fmtShort(m.total)"/></div>
+                                    <div class="o_isg_chart_bar_wrap">
+                                        <div class="o_isg_chart_bar">
+                                            <div class="o_isg_seg o_isg_seg_amber" t-attf-style="height: {{ m.fPct }}%"/>
+                                            <div class="o_isg_seg o_isg_seg_indigo" t-attf-style="height: {{ m.rPct }}%"/>
+                                            <div class="o_isg_seg o_isg_seg_blue" t-attf-style="height: {{ m.hPct }}%"/>
+                                        </div>
+                                    </div>
+                                    <div class="o_isg_chart_label"><t t-out="m.label"/></div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head mb-2">
+                            <div>
+                                <div class="o_isg_card_title">Revenue Attribution</div>
+                                <div class="o_isg_card_sub">Trailing 6-month share</div>
+                            </div>
+                        </div>
+
+                        <div class="o_isg_mix_layout">
+                            <div class="o_isg_svg_gauge">
+                                <svg viewBox="0 0 36 36" class="o_isg_donut_svg">
+                                    <circle class="o_isg_donut_track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.4"/>
+                                    <circle class="o_isg_donut_seg_blue" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.4"
+                                        t-att-stroke-dasharray="mixSegments.hDash"
+                                        t-att-stroke-dashoffset="mixSegments.hOffset"/>
+                                    <circle class="o_isg_donut_seg_indigo" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.4"
+                                        t-att-stroke-dasharray="mixSegments.rDash"
+                                        t-att-stroke-dashoffset="mixSegments.rOffset"/>
+                                    <circle class="o_isg_donut_seg_amber" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.4"
+                                        t-att-stroke-dasharray="mixSegments.fDash"
+                                        t-att-stroke-dashoffset="mixSegments.fOffset"/>
+                                </svg>
+                                <div class="o_isg_gauge_center">
+                                    <div class="o_isg_gauge_val o_isg_gauge_val_sm o_isg_num"><t t-out="fmtShort(state.mix.total)"/></div>
+                                    <div class="o_isg_gauge_lbl"><t t-out="state.currency"/></div>
+                                </div>
+                            </div>
+
+                            <div class="o_isg_mix_list">
+                                <div class="o_isg_mix_row">
+                                    <span class="o_isg_mix_name"><i class="o_isg_dot o_isg_dot_blue"/>Hardware Store</span>
+                                    <span class="o_isg_mix_amt o_isg_num"><t t-out="fmtShort(state.mix.hardware)"/></span>
+                                    <strong class="o_isg_num"><t t-out="pct(state.mix.hardware, state.mix.total)"/>%</strong>
+                                </div>
+                                <div class="o_isg_mix_row">
+                                    <span class="o_isg_mix_name"><i class="o_isg_dot o_isg_dot_indigo"/>Building Rent</span>
+                                    <span class="o_isg_mix_amt o_isg_num"><t t-out="fmtShort(state.mix.rent)"/></span>
+                                    <strong class="o_isg_num"><t t-out="pct(state.mix.rent, state.mix.total)"/>%</strong>
+                                </div>
+                                <div class="o_isg_mix_row">
+                                    <span class="o_isg_mix_name"><i class="o_isg_dot o_isg_dot_amber"/>Delivery Fees</span>
+                                    <span class="o_isg_mix_amt o_isg_num"><t t-out="fmtShort(state.mix.fleet)"/></span>
+                                    <strong class="o_isg_num"><t t-out="pct(state.mix.fleet, state.mix.total)"/>%</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============ LEASE SCHEDULE & RECEIVABLES TABLES ============ -->
+                <div class="o_isg_grid o_isg_grid_1_1">
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Upcoming Lease Billing (30 Days)</div>
+                                <div class="o_isg_card_sub">Active contracts scheduled for invoicing</div>
+                            </div>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openLeases()">
+                                All Leases <i class="fa fa-angle-right ms-1"/>
+                            </button>
+                        </div>
+                        <t t-if="state.upcomingRent.length">
+                            <div class="o_isg_table_wrap">
+                                <table class="o_isg_table">
+                                    <thead>
+                                        <tr><th>Tenant</th><th>Unit</th><th>Next Billing</th><th class="text-end">Amount (<t t-out="state.currency"/>)</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.upcomingRent" t-as="r" t-key="r.id">
+                                            <tr tabindex="0" t-on-click="() => this.openRecord('isange.lease', r.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openRecord('isange.lease', r.id))">
+                                                <td>
+                                                    <div class="o_isg_person">
+                                                        <span class="o_isg_avatar"><t t-out="r.initials"/></span>
+                                                        <span class="o_isg_person_name"><t t-out="r.tenant"/></span>
+                                                    </div>
+                                                </td>
+                                                <td class="o_isg_muted"><t t-out="r.unit"/></td>
+                                                <td>
+                                                    <span t-attf-class="o_isg_status_badge {{ r.overdue ? 'o_isg_status_rose' : (r.dueToday ? 'o_isg_status_amber' : 'o_isg_status_slate') }}">
+                                                        <i class="o_isg_status_dot"/>
+                                                        <t t-out="r.due"/>
+                                                    </span>
+                                                </td>
+                                                <td class="text-end fw-semibold o_isg_num"><t t-out="fmt(r.amount)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="o_isg_empty o_isg_empty_sm"><div>No lease billing scheduled in the next 30 days</div></div>
+                        </t>
+                    </div>
+
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Open Rent Receivables</div>
+                                <div class="o_isg_card_sub">Posted invoices awaiting tenant settlement</div>
+                            </div>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openOutstandingRent()">
+                                View All <i class="fa fa-angle-right ms-1"/>
+                            </button>
+                        </div>
+                        <t t-if="state.openInvoices.length">
+                            <div class="o_isg_table_wrap">
+                                <table class="o_isg_table">
+                                    <thead>
+                                        <tr><th>Invoice</th><th>Tenant</th><th>Due Date</th><th class="text-end">Balance (<t t-out="state.currency"/>)</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.openInvoices" t-as="inv" t-key="inv.id">
+                                            <tr tabindex="0" t-on-click="() => this.openRecord('account.move', inv.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openRecord('account.move', inv.id))">
+                                                <td class="o_isg_mono"><t t-out="inv.name"/></td>
+                                                <td>
+                                                    <div class="o_isg_person">
+                                                        <span class="o_isg_avatar"><t t-out="inv.initials"/></span>
+                                                        <span class="o_isg_person_name"><t t-out="inv.tenant"/></span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span t-attf-class="o_isg_status_badge {{ inv.overdue ? 'o_isg_status_rose' : 'o_isg_status_slate' }}">
+                                                        <i class="o_isg_status_dot"/>
+                                                        <t t-out="inv.due or '—'"/>
+                                                    </span>
+                                                </td>
+                                                <td class="text-end fw-semibold o_isg_num"><t t-out="fmt(inv.residual)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="o_isg_empty o_isg_empty_sm"><div>All posted rent invoices are settled</div></div>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- ============ FLEET DISPATCH LOG & VEHICLE ROSTER ============ -->
+                <div class="o_isg_grid o_isg_grid_2_1">
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Recent Vehicle Dispatch Log</div>
+                                <div class="o_isg_card_sub">Customer deliveries, stock pickups and site operations</div>
+                            </div>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openTrips()">
+                                All Trips <i class="fa fa-angle-right ms-1"/>
+                            </button>
+                        </div>
+                        <t t-if="state.recentTrips.length">
+                            <div class="o_isg_table_wrap">
+                                <table class="o_isg_table o_isg_table_wide">
+                                    <thead>
+                                        <tr><th>Reference</th><th>Vehicle / Driver</th><th>Destination</th><th>Status</th><th class="text-end">Fee</th><th class="text-end">Cost</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.recentTrips" t-as="t" t-key="t.id">
+                                            <tr tabindex="0" t-on-click="() => this.openRecord('isange.vehicle.trip', t.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openRecord('isange.vehicle.trip', t.id))">
+                                                <td>
+                                                    <div class="o_isg_mono"><t t-out="t.name"/></div>
+                                                    <div class="o_isg_muted small o_isg_num"><t t-out="t.date"/></div>
+                                                </td>
+                                                <td>
+                                                    <div class="o_isg_person_name"><t t-out="t.vehicle"/></div>
+                                                    <div class="o_isg_muted small"><t t-out="t.driver"/></div>
+                                                </td>
+                                                <td>
+                                                    <div class="o_isg_person_name"><t t-out="t.destination"/></div>
+                                                    <div class="o_isg_muted small"><t t-out="t.type"/> · <span class="o_isg_num"><t t-out="fmt(t.distance)"/> km</span></div>
+                                                </td>
+                                                <td>
+                                                    <span t-attf-class="o_isg_status_badge o_isg_status_trip_{{ t.state }}">
+                                                        <i class="o_isg_status_dot"/>
+                                                        <t t-out="t.stateLabel"/>
+                                                    </span>
+                                                </td>
+                                                <td class="text-end o_isg_num fw-semibold"><t t-out="fmt(t.fee)"/></td>
+                                                <td class="text-end o_isg_num o_isg_muted"><t t-out="fmt(t.cost)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="o_isg_empty o_isg_empty_sm"><div>No vehicle trips recorded in the last 6 months</div></div>
+                        </t>
+                    </div>
+
+                    <div class="o_isg_card">
+                        <div class="o_isg_card_head">
+                            <div>
+                                <div class="o_isg_card_title">Fleet Roster</div>
+                                <div class="o_isg_card_sub">Income, maintenance &amp; travels per vehicle</div>
+                            </div>
+                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleFleetManager(true)">
+                                Manage <i class="fa fa-angle-right ms-1"/>
+                            </button>
+                        </div>
+                        <t t-if="state.vehicles.length">
+                            <div class="o_isg_vehicles">
+                                <t t-foreach="state.vehicles" t-as="v" t-key="v.id">
+                                    <div class="o_isg_vehicle" role="button" tabindex="0" t-on-click="() => this.toggleFleetManager(true, v.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleFleetManager(true, v.id))">
+                                        <span class="o_isg_vehicle_icon"><i class="fa fa-truck"/></span>
+                                        <div class="o_isg_vehicle_body">
+                                            <div class="o_isg_vehicle_top">
+                                                <span class="o_isg_plate"><t t-out="v.plate"/></span>
+                                                <span class="o_isg_muted small o_isg_num"><t t-out="fmt(v.odometer)"/> <t t-out="v.odometerUnit"/></span>
+                                            </div>
+                                            <div class="o_isg_person_name"><t t-out="v.name"/></div>
+                                            <div class="o_isg_muted small o_isg_num">
+                                                Inc <t t-out="fmtShort(v.income)"/> · Maint <t t-out="fmtShort(v.maintenance)"/> · <t t-out="v.tripsCount"/> trips
+                                            </div>
+                                        </div>
+                                        <div class="o_isg_vehicle_odo o_isg_num">
+                                            <div t-attf-class="fw-semibold {{ v.net &gt; 0 ? 'o_isg_c_green' : (v.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
+                                                <t t-if="v.net &gt; 0">+</t><t t-out="fmtShort(v.net)"/>
+                                            </div>
+                                            <div class="o_isg_muted small">net</div>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="o_isg_empty o_isg_empty_sm"><div>No vehicles registered</div></div>
+                        </t>
+                    </div>
+                </div>
+
+                <footer class="o_isg_footer">
+                    <span>Isange Hardware ERP · Sales, Point of Sale, Procurement, Commercial Real Estate &amp; Fleet Operations</span>
+                    <span>Reporting Currency: <strong><t t-out="state.currency"/></strong></span>
+                </footer>
+            </div>
+        </div>
+    </t>
+
+</templates>

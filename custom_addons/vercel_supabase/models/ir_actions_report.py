@@ -636,9 +636,9 @@ class IrActionsReport(models.Model):
                 continue
             tbl = lxml.html.Element('table')
             tbl.set('class', 'o_layout_grid')
-            tr = lxml.html.SubElement(tbl, 'tr')
+            tr = lxml.etree.SubElement(tbl, 'tr')
             for idx, col in enumerate(div_children):
-                td = lxml.html.SubElement(tr, 'td')
+                td = lxml.etree.SubElement(tr, 'td')
                 td.set('class', col.get('class') or '')
                 pad_left = '12pt' if idx == 1 else '0'
                 td.set('style', f'width: 50%; vertical-align: top; text-align: left; padding-left: {pad_left};')

@@ -41,10 +41,10 @@ requirements.odoo.txt
 scripts
 supabase
 
-# Exclude heavy non-sales/non-invoicing addons from the Vercel function bundle
-# to keep total uncompressed bundle size comfortably below Vercel's 225 MB cap
-# while keeping Sales, Pro-Forma Invoices, Invoicing, Contacts, CRM, Stock,
-# Purchase, Portal, and all country l10n_* localizations intact.
+# Exclude heavy unused addons from the Vercel function bundle to keep total
+# uncompressed bundle size comfortably below Vercel's 225 MB cap while keeping
+# Isange Hardware ERP (Sales, Pro-Forma, Invoicing, POS, Stock, Purchase,
+# Fleet, Maintenance, Expenses, Contacts, Portal) and l10n_* intact.
 addons/spreadsheet
 addons/spreadsheet_*
 addons/website_slides
@@ -66,7 +66,6 @@ addons/hr_timesheet
 addons/hr_attendance
 addons/project
 addons/project_*
-addons/fleet
 addons/pos_self_order
 addons/im_livechat
 addons/event

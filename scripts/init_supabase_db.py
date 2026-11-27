@@ -51,9 +51,9 @@ def main() -> int:
         '--modules',
         default=os.environ.get(
             'ODOO_DEFAULT_MODULES',
-            'base,web,contacts,sale_management,account,vercel_supabase',
+            'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,vercel_supabase',
         ),
-        help='Comma-separated list of modules to install (default: base,web,contacts,sale_management,account,vercel_supabase).',
+        help='Comma-separated list of modules to install (defaults to Isange Hardware ERP suite + vercel_supabase).',
     )
     parser.add_argument(
         '--upgrade',
@@ -90,6 +90,8 @@ def main() -> int:
 
     import odoo  # noqa: PLC0415
     import odoo.api as api  # noqa: PLC0415
+    import odoo.sql_db as sql_db  # noqa: PLC0415
+    from odoo.modules.module import Manifest, initialize_sys_path  # noqa: PLC0415
     from odoo.modules.registry import Registry  # noqa: PLC0415
 
     db_name = _BOOT_CONFIG_META['db_name']
@@ -99,6 +101,29 @@ def main() -> int:
             "Switch to Supabase Session Pooler (port 5432) or initialization may fail.",
             file=sys.stderr,
         )
+
+    db = sql_db.db_connect(db_name)
+    with db.cursor() as cr:
+        cr.execute("SELECT to_regclass('public.ir_module_module')")
+        if cr.fetchone()[0] is not None:
+            initialize_sys_path()
+            cr.execute(
+                "SELECT id, name, state, auto_install FROM public.ir_module_module "
+                "WHERE state IN ('uninstalled', 'to install')"
+            )
+            missing_ids = [
+                row[0] for row in cr.fetchall()
+                if (row[2] == 'to install' or row[3])
+                and Manifest.for_addon(row[1], display_warning=False) is None
+            ]
+            if missing_ids:
+                cr.execute(
+                    "UPDATE public.ir_module_module "
+                    "SET state = 'uninstalled', auto_install = false "
+                    "WHERE id = ANY(%s)",
+                    (missing_ids,),
+                )
+                cr.commit()
 
     upgrade_mods = tuple(m.strip() for m in args.upgrade.split(',') if m.strip())
     install_mods = ()

@@ -1,0 +1,1450 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ========================================== -->
+    <!-- 0. ASSETS, COMMAND CENTER & PDF REPORTS    -->
+    <!-- ========================================== -->
+
+    <record id="action_isange_command_center" model="ir.actions.client">
+        <field name="name">Isange Command Center</field>
+        <field name="tag">isange_command_center</field>
+    </record>
+
+    <record id="action_isange_fast_sale" model="ir.actions.client">
+        <field name="name">Fast Hardware Sale (20s)</field>
+        <field name="tag">isange_fast_sale</field>
+    </record>
+
+    <record id="action_isange_stock_manager" model="ir.actions.client">
+        <field name="name">Stock &amp; Inventory Manager</field>
+        <field name="tag">isange_stock_manager</field>
+    </record>
+
+    <record id="action_isange_fleet_manager" model="ir.actions.client">
+        <field name="name">Vehicle &amp; Fleet Manager</field>
+        <field name="tag">isange_fleet_manager</field>
+    </record>
+
+    <record id="action_isange_quick_new_lease" model="ir.actions.act_window">
+        <field name="name">New Commercial Lease</field>
+        <field name="res_model">isange.lease</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{
+            'default_property_id': active_id,
+        }</field>
+    </record>
+
+    <record id="action_isange_quick_new_expense" model="ir.actions.act_window">
+        <field name="name">Log Building Repair / Utility Bill</field>
+        <field name="res_model">isange.property.expense</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{
+            'default_property_id': active_id,
+        }</field>
+    </record>
+
+    <!-- Printable PDF Report 1: All-in-One Executive Business Summary -->
+    <record id="action_report_all_in_one_property" model="ir.actions.report">
+        <field name="name">All-in-One Business Summary (PDF)</field>
+        <field name="model">isange.property</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">isange_property_fleet.report_all_in_one_document</field>
+        <field name="report_file">isange_property_fleet.report_all_in_one_document</field>
+        <field name="binding_model_id" ref="model_isange_property"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Printable PDF Report 2: Commercial Lease Statement & Rent Proforma -->
+    <record id="action_report_tenant_lease_pdf" model="ir.actions.report">
+        <field name="name">Commercial Rent Proforma &amp; Lease Statement (PDF)</field>
+        <field name="model">isange.lease</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">isange_property_fleet.report_lease_document</field>
+        <field name="report_file">isange_property_fleet.report_lease_document</field>
+        <field name="binding_model_id" ref="model_isange_lease"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Printable PDF Report 3: Branded Proforma Invoice on Sales Orders / Quotations -->
+    <record id="action_report_isange_proforma_sale" model="ir.actions.report">
+        <field name="name">Isange Proforma Invoice (PDF)</field>
+        <field name="model">sale.order</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">isange_property_fleet.report_isange_proforma_sale_document</field>
+        <field name="report_file">isange_property_fleet.report_isange_proforma_sale_document</field>
+        <field name="binding_model_id" ref="sale.model_sale_order"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Printable PDF Report 4: Branded Commercial / Tax Invoice on Account Moves -->
+    <record id="action_report_isange_branded_invoice" model="ir.actions.report">
+        <field name="name">Isange Branded Invoice / Proforma (PDF)</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">isange_property_fleet.report_isange_invoice_document</field>
+        <field name="report_file">isange_property_fleet.report_isange_invoice_document</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- REUSABLE BANK & PAYMENT DETAILS BLOCK (ALL PROFORMAS & INVOICES)   -->
+    <!-- ================================================================== -->
+    <template id="report_bank_details_block">
+        <div class="isange_bank_details" style="margin: 0 0 5px 0; border: 1px solid #cbd5e1; border-radius: 5px; overflow: hidden; background-color: #ffffff; text-align: left; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background-color: #ffffff;">
+                <tr bgcolor="#1b365d" style="border: none; background-color: #1b365d;">
+                    <td colspan="4" style="padding: 4px 10px; border: none; background-color: #1b365d; font-size: 9px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #ffffff; text-align: left;">
+                        ISANGE HARDWARE LTD — BANK &amp; PAYMENT DETAILS
+                    </td>
+                    <td colspan="2" style="padding: 4px 10px; border: none; background-color: #1b365d; text-align: right; font-size: 8.5px; color: #e2e8f0; white-space: nowrap;">
+                        Account Name: <strong style="color: #fbbf24;">ISANGE HARDWARE LTD</strong>
+                    </td>
+                </tr>
+                <tr style="border: none; background-color: #ffffff;">
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAsCAMAAACkN+1nAAABgFBMVEX//////v/+///0/v////7///3///v//vz+//3+/v7+/vv9/vz+/fv9/fz7/Pz///X///H//+7//+v//fH9//P9/fP//+b+/OX//tr+/s7+/rX7+vv8+uzv+Pj9+tT79s7++rX89bT28M/5763y6cLt6NLd7vLQ29f995j575j26pn36n7144nt44bw3X7s2Hrx2Vfx2D/g2H3j10ft0lbszFDszjzsyjrwzSv1zRPpzirvxznoyD/5xxbvyCbswjPtvhrdz4LfzV7kzTfbzkHcxUvSsTK7zNO4xMO+wF/Brjyqqk6onGKZmWOOgz6DcCZqgFpldGxob1BlZiFCZXJGURg7VD4mWGUcTVYfRT4GVXcGT3IJTW0DTXAKS3QES3MHSmQLR20LQ2cLRFsDRmoCQ2YCRF4rPRAYPT8PPlkQPkIIP18IO1wJPFIDQGECP1sDPFwCP1EDPFICOlISNz4jNhMjLxMSMTQLN1MMODILM0QEOFwEOFcFOE8FM1AGJDWrM1BLAAAIvklEQVR42rWXiVfa2haHIy+GmQAVkqAyNA4QRpkRiCVIAalYL6L1iqiAIAICKiqT919/O6CtvdWu9a73/SQs4SzOlz2eHQQBCZD/vwSIGEFEgldXUBQVicTi90MUiwJkcXHlJy1O9Z+JEIUAfT9kJbW790MHez9rdze5qFC8hyBGFIqVvYM/C2els1KpVAe14Go2W62Hh/Hj4BE0uN1deR9FMLOYKvw51VGhUCgW4e3s7KwMyFK5Xm4A+eGvXcU8IvjnoVEgq3tTxMkRr+JJoVwtl78dHLbqjatGA65mffAtKZAjP0P+lzCJBcmDqRknJ8fHJ8Vi8bRbrl98Te9f1EvnV9Vqu91p1W+3F2df/Gj2N4jXV1Yn3joqFo+Oj4/BUcVK8TKf5rZ7YMk5MNqdJvhrdVYEiS5DJPALDIcL/l5HCF/jrJzyDPATMAqn5VapWDnMeuJcrl+vnp+3280GD0kBQoQQiBycJsEkIjGO4LCbWPK0OabBxNPSmnnNUHDXURGcNYGUD/chGHvpeGgtU7stV8/bzWZzCJAkRB7VUpRaKkYkErmKpNQqBCoVg/1QFJMqSUwoRBC5SK1WCrFfcjh5wJtR5CGV8sUfsUy+l//iCwW53H2rPYFM3DWPoEoTwzDkBwGG6WmG0av5G5bym4gkJGOj1Tgix5WwsoAhEqlUJPweoScIr+PK6UU+7dncytXymfi6N9u7bJ93gDGaQhCc4RIJG6WaU5m9CY5WSTAZosERiVymZRIRn0Ut0WgZLsLpMUSDqDDN7GT/F5CTk8rp6bf7jIdlPWmgbHk86Xy/e3UF3ho9W8L4gqzPTCn1rmDQx2jlUpWKVONqREbawizrpTCVycVGfRSGzClJUoshQtELS46OeUa5n+M8/s8JLp27A0oid1+/6lyPJpDUIirALf5oiHXpdEwgxEZslFZrstnsNpNWTTnC0VDcrjNaA9FQQDcnJY2MzUYbcLmM9xgPKUDyAqR8uZ92be3kdjI8ZWeTy97Vh53u9Wg0zS6BygJbfYpYrV42FA1bdRTtjMQjESdN6XhI0Ge1+jYApsOUtNMXCXhtBlwhRH5AgNE63Ibdexe9/JZ3K1/LuDO9h+b19fXUEgwR85aw4bh/LRxmeQjt3VgHCFB01iBANmAlGAz5aT1EJh4IBCMOPTbN8WS5AIZAtwJncRDs08tebtOXreXT6f1B/fq63Xm2RGmJsGuujWAw4FrjIc6NgMtqc4YDDrNjI7q2xn5iw6411m82esM+h826xvpo5RSy2iocFypnpcv8lt+X69XPS/38Zz+Xq2WmkM7EkqQGRZQ6/4bL6t3w+8zWjbAVDPGZdZTFt+4yO8Ks1eoHupWH0L6wy0gZrb6Ig5yehsnWKTDO6v2shw1mexf1ei+XCHoytRxAmjfXw+FoPE3hOaM/7DJbOM6mc0QiVgsX9+r0etoV53iIg7ZynMW8FvXTtC/ihBWT0+cgp6UClhSOwZCvMW59/XPu7h4yK8AGvbna9v6gc8Mn1yMPmUdwnT/g1FGkwahzxONWsyvuMVOUxRN3mZ0sa6OMtElndn3ym01cxGWGJPQlHOS0+pMPZxUI+7fd7TTn8fDZtbUejUbXsrWvB4/tm9FoNB4ARCNGlPwdUkpcqaImEHhzWa2u+KbV6GSDDEmSBGnysn4j5Yx4XHyqcRYCeYacVarV8uXhfi6bcbs5z3ooFI0GN/P73wAClDHvLg1UPM0l3AT0RYk2lti060zOeDweiW9CDtvjEUYpw2Vao3PDZ4Ls2tyMRCC7DNDYniBQ7tVuuXXb79VyGR4SjYZCntzd5Wh0A2Uy5t2lkSMo6XAwahQ6pIp2OyhCrYNq8HFOo1rFuGNLuAxDcdLJcSYtBYFLJBIOgwqqkZ+5kg+lCkCq1UajfnlxB5hEPBgKhdayd4PxzXgM/nqcpDAiUBsMeozvSHMqPYkLZ5R6CzRK6CwawmBQg62I5ANBUaSGIPW03UYTuOy51T+Wq6eV8+pVqdQol1uXd7WdLT87gdyOb0YPcPEQ2FuqIAiZZJafKWYnRSZV8QTZnBRXEYSSP19m5agSxSQSCabVKtWY8PmMTw7KVTidQFdXpWq327q9y2c21/kD5b4FLWU8GgIkuShHpDhJLkgUGgmGCTVyOSKYJSDWuFaLa/XEwgLv0B9nCGSV/MV5ApAnxtVVu9ttNuv9WnZzPZLO3zc7E3/xlsChhX2kGQOuUmvVhFar+jCH6pcMRlpvYmiGpj7qP8inBwgfapQfBF6ejIPSeaUyQTQ619fdDgxB970djkvX+s0OpNbNI6RwSgMQOmajaZOJNhloml4i9Usxxu62OeHFme1L3wPwykwBkEoFhqxGgz+fWt3uVWn4cHGXi8Vq/RZU+3j0MK0TAU7HLG4747Y7bTG3O0ZTtBtyyWxxQq073b9CfrKkPPFVpwP3DZZ0h8NhEyhfU4f9wRgYwwlkXoziH+2mGGNxWxxOu81uZyjgWd0MHTPZHE6OVsreHu5Sk5jwAxYIGN12ByLRuuzvHQ7G8Bn6Cg+BQVVE0CbaYISDHrzFmAyEgYZWojcsgfd0zBL2NkQAkHK1XW1MIBD4icbjy8FgMBoOu93r4bjPZ9cMIkJUShWh1uq1kLBqQr2ggswlPhAEThKEVgkz0ptK3d/2+7ff1X/W/T1gBtPPd5MuPCuCmxViszjUIYbOiOHJRSyUoDCBwTdCISZ8a7BE0VQt/121n9Tr9Z7+u+Pnrjel4ce9383GMmRpO731e2Uyf2wvzz8/cKGTC32Rp5JpefwW8iURX3+hIBzOwUAwPv0ysBEMJNI728uTAfUfSjZLxKAjsiz76U19zu6klt/BgPGPWEpntj6/qunXW9nc9qpE/q5nRolyKfYlu/Mb/bGdksy/78FUtKDSL6W+PGkbXn/Tl9TqolyBvOtBG7JCgy1MtLw8fb3QyvLCwrx0Hvk3NP8kaAHzM7+s/SuIv3lC/sviu1z1X+qJr9521CaAAAAAAElFTkSuQmCC" alt="MTN MoMo" style="max-height: 19px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">MTN MoMo</div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">0794766952</div>
+                    </td>
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <img src="data:image/png;base64,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" alt="Bank of Kigali" style="max-height: 21px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">Bank of Kigali (BK)</div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">100090240131</div>
+                    </td>
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <img src="data:image/png;base64,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" alt="Equity Bank USD" style="max-height: 19px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">Equity <span style="background-color: #fee2e2; color: #991b1b; padding: 0 4px; border-radius: 2px; font-size: 7.5px;">USD $</span></div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">4014201237394</div>
+                    </td>
+                </tr>
+                <tr style="border: none; background-color: #ffffff;">
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: none; background-color: #ffffff;">
+                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAsCAMAAADigU7NAAABgFBMVEX///////3//v///v7//f///fz+///+/v/+/v7+/v39/v7+/f39/f79/f3+/fz8/f3//P39/Pz8/Pz/+/r9+/v++vj7+/v6+vv9+ff5+Pj+9vP39/fz8/P18O/56ujr6url5eXz4eHi4eLe3d7y0dDX1NTNzc3Jx8jjurnEv7+5uLjaqqnPlZarqqvAmpikpKSgn6CamZqVlJXMh4XJfX3AfHuwgoGJiIiEgoOBf4B9e3y6cXN+cXJwbm+uXl+QW1ubRUWNPj1nZmdiYGFZWFhLSElEQUI9OzyjMTCjLyukLiigLimlLSugLSimLCuiLCefLCipKyylKimkKyukKyajKiiiKyqiKiugKyuiKySfKiapKCupKCWmKCmtJSqoJSukKSujKSqlKSihKSujKCqkJimcMSycLiidLSmQMzKOLSmeKyqQKymZJymTJiaPJyeJJyaVIiONIiNwLCo2NTYuLS0lIyMiICEcGxsZGBgWFRYTEhISDxARDQ8NDA0IBgfP4yANAAAGJElEQVR42qVWi18haxh+ZTlTHcklGpUUSWRJa1N2rHIvYaLcNaXIIsMql4b+9fPNKFu7dX5nz77zM4PvfZ/ved7LzAC8azyAafgDw7jzn0DIQP1RzfL4nyaHFVfFbVKBBJv6/egJCcg+um9TNdquA6Xyt+P5M6DbrNTJeLnUcBmQDOx3onkCmOUb3HQxmyyVo2S9gjIBfP6/74gc+C98VB/36ySZuslETi8jFdq1wsl6N1oueZU8uUDnooPhq4vjav78MpypBmm3CWT4+/vPf5iVzc7K5ngwPQMintq03wqdpU4vo9GT/MVR9TRHNiubKxPy99jLDNubnG0bcIlQoHN+qwUT6ZtYIp1OnKRuqul0+jDUchlmP2DvADjpBt1qoMOpEs6ZUPFK5fLxcSKRSEePqtVYNFPOXJPN/U3VOwrmnLdkNHp4GLx1zak/o+KRN+WbRC6XS2TqpVQqk89S1+fZUI12qt8GUDmbOUQzfdR0mb5+Kx+mLykqW8jlItWGu0IH8+eF8yx5kk4c1t0G2a/DwZ9EAORJNps/uQ6669lEOnZGnZ8XcsFGxa4zfKVLwevsSSady5GRxv7mPMz/nIkZFqCIQvL5ai1YyGVuqknqIpxBtZtTyXT27xWU0nK0UCAzoXrNpfuZAx9U9ttwMllMpWKhWDQSp+KX8UywTrvUfDGaApVpvxFKZDLx/Hn2Klqm902/VGHOfhuKpVIplPDjWLJYpK7OSt8qJjVMgXAK7Yfa6gi101WhQJXLR7WKfUUmmnoJMG9vnsVSiPbFWSx2lgzHkyX6qwGETw5SWNmmb5In8dOLVKlKhcstl44nfA1wGz5LximKujyNlePXVK2yrQbRDwfevMndKKbQ9kUqkk5HG260jr9iEKGoC+oqn8+iehYbbhOPJ518IVMIOmetHjxOR5NJ1J9n9ZpzRTbzIwfOZiRPFYvxeLZQSNRp54pA8lOiJKDe3G+SiUwse34ZPSHJltvEdbYYYxk4m+GLi2Q1lSrGybrbtAQzb7TbrMFVj7PVTBUvTxPRMsrlvGJmigOw18OhcCQcDpbQ6Bt48NaNVCxGHVsphUkyGI6EjoLB0jfuVsWawNm6bbWazWaL3t9eAfmbd3IMm5lSmdw069dssUbT3z8uyaUcOfunbXSgs0Emk/wSKh737qxuk3X9tL3NBXz+rJOJRgMtEwh4gjnEaPKNh4uQPWN/jR4ykwL4IAMBf3KSJxOAHGVLKAaFGK0oFvC/0UX09GFNpFRgMIWLEP8R2ojKj5u8QjEq8nisJqdfPdZQIDZ2kI87a2JU/emxo3J9y2q1WKx69uea1bql51zWLcYFgFWbdRlwo20dXzZbLVtbVotVq7dtrYECNGareZHFwInH/nDQeXSAdMnhZx6Z9u4yAnA8etCysXunh8WDxz3Q+oe9Xq87HJr17aFXA+Kdzp2Vk6Mgend+ny9gg+U9ph/wBvoMoeEAEM7GfZsF6O+C1htod+6RpxHM9909gfmuv/fUpwTzRavRaJfB2unu6TVrXzrdXSUC8CIGGx0EsHTwsAtKrXaj3dvRahcB22XuHP6hd3WUAzExILRajRRtNDhYQn/gRN+ngV1OAgewyAIgWw70zVyVVn39+157AxakIwkPdz6/dx2p7FkA0xuR8IAeMWDRRgAEAsAUsBroW9iaYrDR7t7b4Km+cqLXYQYdI6wFOmYw+tpGLorNgWiUA04Cu3GgZx71g8Ix9Gqfqy0lBl6r1bwKGh+zA2v+od/T92nZHCwsIAYBVsLA8RIAfWwMyoBoDOCYkaJOhJ2HgBnWA71u52ARbA+sSILxa1mA3dcAaNUzBpAQPT9BEAesBubOs+Pvdu6NoNQHBn6Hp8PsKFgJDsBYgO4zwNYLAPnBsM8wfdRIsOHrD4YP3S7j1eLyrc6AYbpIjHzRgxqJZdAeWp5mwjZ8loCB0uIhWDOjMdHYCJ9ny0F4zDiIjHtez45GqIQFq8eMRgo0ux79KEZh9tiWx1PHx5EtSEUgQZ25sIqqP4EvSUVo1NB3PvKaVuBKEZpMKY6PRwp/+7UJw6d/etOUiv7LSyk2Glzu1VT0Yp5Fo+vE8/ILv+frP0rIfywufGnEAAAAAElFTkSuQmCC" alt="Equity Bank RWF" style="max-height: 19px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: 1px solid #e2e8f0; border-bottom: none; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">Equity <span style="background-color: #f1f5f9; color: #334155; padding: 0 4px; border-radius: 2px; font-size: 7.5px;">RWF</span></div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">4014200800883</div>
+                    </td>
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: none; background-color: #ffffff;">
+                        <img src="data:image/png;base64,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" alt="BPR Bank" style="max-height: 17px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: 1px solid #e2e8f0; border-bottom: none; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">BPR Bank</div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">4491902127</div>
+                    </td>
+                    <td style="width: 7.5%; padding: 5px 4px 5px 8px; text-align: center; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: none; background-color: #ffffff;">
+                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB8AAAAsCAMAAACqnpMIAAABgFBMVEX///////7+/////v/+/v/+/v7+/v3+/f39/v79/f79/f39/fz9/Pz8/Pz8/Pv8+/v7/Pv7+/v7+vn5+fn4+fj49/f39/f39vb29vb19fT29PPz8vHx8vHw7+7t7Ozq6Ofo5+bn5eTl5eXk4+Pi4uHj4OHg4N/h3d3e397d3dzd3Nve29rd2tnb2tnY19XY1dTU1NTRz87NysnIyMbGw8LCv72/v727uri5tbK1sq+wrqyxq6qrqKanoqGinZ2cmZiclpWWkI2Ri4qNi4iOh4WKh4OMg4GHgX+EfXqAfXx/eXh/d3V4dnR5cW55bmt2b2xzb21zbGpwZmVqZ2RrYmFnYmBnXlxjX1xjXFpiWFdbWFRbVFFYTktSTUtWSUdTSERWRkZORUNJQj9NQD9JPTpHPTtEPDhDOjlDNzRCNDA8NTE+MzE/MS86MS08LSw6Liw3LSozLCk4KSc1KSU1JiQzIh8uJiMvIx4uIh8tIR4rHx0pHR0nHhomGxklGBgdFRMa7wI3AAADVUlEQVR42nVT519aSxAdX3J95Ebio4kgRUIXQaoIKD2ASG8i9QGCFEFalBLgX89eLDGA82F/d/fMnp075wwACgxwABZaKMT3hkCINckHcFlpwD1YycFAF1BAdBGE82meR3Nq1q67FjEmNzsNNdo6cBaEktO/0H8ZvNDUD6rifGgBU68klmV075+wJGK54cABhoobtKVJQfq9GQHsLeEk99hu1lrVM1CzBaVf/YJEWIu+o+cpxRLZ0bFSQgV2eu7JlkWCRpBtoL3iXJlcfqQ8VgrJzMCvGDtTlglv/y88Wl9xVaZZqxUrJcR/6RZQbQ6eqDpvB3QvrcLAmkjkhn2UT/qHOGDgyrz/6KU1z1WyQzMvyD1uj8ft8pu3mAqt/8rv9/kitv0lfrlI0GTJybDfH07jIroRs/W6vcFwlFcvm4+br+WgMhv1vsHD5TZE0szvOo3zYRzYf61xj0QhGtVr2YCTmKT2AIz1gYtJ6PmmL2D2vBmk2dlTep9qGw8uAHb+SLhkEYI8uQg1M9/OJrcGwPBVHcXU/QuruJkB+/XxmlPIoMlHpQCccn5XJwPauodUmVnVzoVTFweo50rYhhUbAcPR+VlB5tjSxHtaRLgS5JPwuBFVA9/dGsf58GWVX383TxqBQzL26pZd+Lz2vjRh/wanAblm6ISNwQHFVb0q0nfcm8cALmpPP4sSw70bNk+JqeoolEX6R+9mfsCPIFERGPOGD/jRFF5XpRL1ByCSZC8d4cHH8ZmlZ7ybjXV8C0irKJH+rDWGY0Am48/3ic1LfFquX/8YGns9Q0FhUQBnsAjg4AANAf1g7+synfXfEtfGvSyOJ6oEle/mxink+9Op2DnqlTlpX+Kmp6GFWmypFal5vzMKK2vj2qiqA15+keMTZZnuRznpTV3inKRPNO4TfjXHz7ZPQVvvNkyER0yd+siXu1eEO2dAApBUurlRaAe8fXsjTPCfPcVSo0b9ONg2LfFSx1esGejFlrlSUhF416vtDm6ljllWo73UHpaLvB8zl7477I0RI+LvxiG8uNMc3kw7rVlQcTdpPz5cBOZR69U0zQLQRGzINmjixfZUysrlecLRqEXwIygEujdwiDSnoZ/Ypm7vInGZaEum7KC5o5AxDKfQ8d/SyLUFR+4GbAAAAABJRU5ErkJggg==" alt="NCBA Bank" style="max-height: 22px; max-width: 48px; vertical-align: middle;"/>
+                    </td>
+                    <td style="width: 25.8%; padding: 5px 8px 5px 4px; text-align: left; vertical-align: middle; border-top: none; border-left: none; border-right: none; border-bottom: none; background-color: #ffffff;">
+                        <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; color: #64748b; line-height: 1.2; white-space: nowrap;">NCBA Bank</div>
+                        <div style="font-family: 'Courier New', Consolas, monospace; font-size: 11px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; line-height: 1.25; white-space: nowrap;">2001161170002223</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <!-- Inject Bank Details into Document Footer (Pro-Forma, Quotations, Invoices) -->
+    <template id="external_layout_striped_inherit_bank_footer" inherit_id="web.external_layout_striped">
+        <xpath expr="//div[hasclass('o_footer_content')]" position="replace">
+            <div class="o_footer_content pt-1 text-center">
+                <t t-call="isange_property_fleet.report_bank_details_block"/>
+                <div style="font-size: 9.5px; color: #475569; line-height: 1.3;">
+                    <span t-if="company.report_footer" t-field="company.report_footer" style="display: inline;"/>
+                    <span t-if="report_type == 'pdf'" style="margin-left: 8px; color: #64748b;">
+                        • Page <span class="page"/> / <span class="topage"/>
+                    </span>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- ================================================================== -->
+    <!-- QWEB TEMPLATE A: ISANGE PROFORMA INVOICE (SALES ORDERS / QUOTES)   -->
+    <!-- ================================================================== -->
+    <template id="report_isange_proforma_sale_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 13px;">
+
+                        <!-- Top Brand Banner -->
+                        <table style="width: 100%; border-collapse: collapse; background-color: #1e1b4b; color: #ffffff; border-radius: 10px 10px 0 0; overflow: hidden;">
+                            <tr>
+                                <td style="padding: 24px 28px; width: 60%; vertical-align: middle;">
+                                    <div style="font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fbbf24; text-transform: uppercase; margin-bottom: 4px;">
+                                        CONSTRUCTION MATERIALS · COMMERCIAL RENTALS · FLEET
+                                    </div>
+                                    <div style="font-size: 26px; font-weight: 800; letter-spacing: 0.5px; color: #ffffff;">
+                                        <span t-out="doc.company_id.name or 'ISANGE HARDWARE'"/>
+                                    </div>
+                                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px;">
+                                        <span t-out="doc.company_id.street or 'Gisozi, Gasabo District, Kigali'"/>, <span t-out="doc.company_id.city or 'Kigali, Rwanda'"/>
+                                        · Tel: <span t-out="doc.company_id.phone or '+250 794 766 952'"/>
+                                        · <span t-out="doc.company_id.email or 'isangehardware@gmail.com'"/>
+                                        <t t-if="doc.company_id.vat"> · TIN: <span t-out="doc.company_id.vat"/></t>
+                                    </div>
+                                </td>
+                                <td style="padding: 24px 28px; width: 40%; text-align: right; vertical-align: middle;">
+                                    <div style="display: inline-block; background-color: #f59e0b; color: #111827; font-size: 18px; font-weight: 800; padding: 8px 18px; border-radius: 8px; letter-spacing: 1px;">
+                                        PROFORMA INVOICE
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 700; color: #e2e8f0; margin-top: 8px;">
+                                        Ref: #PF-<span t-field="doc.name"/>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="height: 5px; background-color: #f59e0b; margin-bottom: 22px;"/>
+
+                        <!-- Client & Document Details Two-Column Table -->
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 22px;">
+                            <tr>
+                                <td style="width: 52%; vertical-align: top; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 14px 18px;">
+                                    <div style="font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #4f46e5; margin-bottom: 6px;">
+                                        PROFORMA ISSUED TO (CLIENT)
+                                    </div>
+                                    <div style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
+                                        <span t-field="doc.partner_id.name"/>
+                                    </div>
+                                    <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                        <t t-if="doc.partner_id.street"><span t-field="doc.partner_id.street"/><br/></t>
+                                        <t t-if="doc.partner_id.city"><span t-field="doc.partner_id.city"/><br/></t>
+                                        <t t-if="doc.partner_id.phone"><strong>Tel:</strong> <span t-field="doc.partner_id.phone"/><br/></t>
+                                        <t t-if="doc.partner_id.email"><strong>Email:</strong> <span t-field="doc.partner_id.email"/><br/></t>
+                                        <t t-if="doc.partner_id.vat"><strong>Client TIN:</strong> <span t-field="doc.partner_id.vat"/></t>
+                                    </div>
+                                </td>
+                                <td style="width: 4%;"/>
+                                <td style="width: 44%; vertical-align: top; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 18px;">
+                                    <div style="font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #b45309; margin-bottom: 8px;">
+                                        DOCUMENT DETAILS
+                                    </div>
+                                    <table style="width: 100%; font-size: 12.5px; line-height: 1.7;">
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Proforma Number:</td>
+                                            <td style="text-align: right; font-weight: 800; color: #0f172a;">PF-<span t-field="doc.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Issue Date:</td>
+                                            <td style="text-align: right; font-weight: 700;"><span t-field="doc.date_order" t-options='{"widget": "date"}'/></td>
+                                        </tr>
+                                        <tr t-if="doc.validity_date">
+                                            <td style="color: #64748b; font-weight: 600;">Valid Until:</td>
+                                            <td style="text-align: right; font-weight: 700; color: #b45309;"><span t-field="doc.validity_date"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Prepared By:</td>
+                                            <td style="text-align: right;"><span t-field="doc.user_id.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Currency:</td>
+                                            <td style="text-align: right; font-weight: 800; color: #4f46e5;"><span t-field="doc.currency_id.name"/></td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Items Table -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px; border: 1px solid #cbd5e1;">
+                            <thead>
+                                <tr style="background-color: #1e1b4b; color: #ffffff; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px;">
+                                    <th style="padding: 11px 12px; text-align: center; width: 6%;">#</th>
+                                    <th style="padding: 11px 12px; text-align: left; width: 46%;">Item &amp; Construction Specification</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 12%;">Quantity</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 18%;">Unit Price</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 18%;">Line Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="row_idx" t-value="0"/>
+                                <t t-foreach="doc.order_line" t-as="line">
+                                    <t t-if="not line.display_type">
+                                        <t t-set="row_idx" t-value="row_idx + 1"/>
+                                        <tr t-attf-style="background-color: {{ '#ffffff' if row_idx % 2 == 1 else '#f8fafc' }}; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 11px 12px; text-align: center; font-weight: 700; color: #64748b;">
+                                                <span t-out="row_idx"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; font-weight: 600; color: #0f172a;">
+                                                <span t-field="line.name"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right; font-weight: 700;">
+                                                <span t-field="line.product_uom_qty"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right;">
+                                                <span t-field="line.price_unit" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right; font-weight: 800; color: #0f172a;">
+                                                <span t-field="line.price_subtotal" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Payment Instructions & Financial Totals -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px;">
+                            <tr>
+                                <td style="width: 54%; vertical-align: top; padding-right: 20px;">
+                                    <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 16px;">
+                                        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #b45309; margin-bottom: 6px;">
+                                            PAYMENT INSTRUCTIONS &amp; PROFORMA TERMS
+                                        </div>
+                                        <div style="font-size: 12px; color: #78350f; line-height: 1.6;">
+                                            <strong>1. Mobile Money (MTN MoMo):</strong> Pay to <strong>0794766952</strong> (Isange Hardware Ltd).<br/>
+                                            <strong>2. Bank Transfer / Deposit:</strong> Account Name: <strong>ISANGE HARDWARE LTD</strong> (see full BK, Equity USD/RWF, BPR &amp; NCBA accounts below; quote Ref <strong>PF-<span t-field="doc.name"/></strong>).<br/>
+                                            <strong>3. Delivery &amp; Validity:</strong> Stock availability &amp; prices valid for 15 days from issue date. Vehicle delivery can be scheduled immediately upon payment confirmation.
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="width: 46%; vertical-align: top;">
+                                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                                        <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 10px 16px; color: #475569; font-weight: 600;">Subtotal (Untaxed)</td>
+                                            <td style="padding: 10px 16px; text-align: right; font-weight: 700;">
+                                                <span t-field="doc.amount_untaxed" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 10px 16px; color: #475569; font-weight: 600;">Taxes (VAT)</td>
+                                            <td style="padding: 10px 16px; text-align: right; font-weight: 700;">
+                                                <span t-field="doc.amount_tax" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #1e1b4b; color: #ffffff; font-size: 15px;">
+                                            <td style="padding: 14px 16px; font-weight: 800;">TOTAL PROFORMA AMOUNT</td>
+                                            <td style="padding: 14px 16px; text-align: right; font-weight: 800; color: #fbbf24;">
+                                                <span t-field="doc.amount_total" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Signature & Stamp Block -->
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 18px;">
+                            <tr>
+                                <td style="width: 48%; padding-top: 16px;">
+                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569;">
+                                        FOR ISANGE HARDWARE (AUTHORIZED SIGNATURE &amp; STAMP)
+                                    </div>
+                                    <div style="height: 55px; border-bottom: 1px dashed #94a3b8; width: 85%;"/>
+                                    <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Authorized Signatory · Date</div>
+                                </td>
+                                <td style="width: 4%;"/>
+                                <td style="width: 48%; padding-top: 16px;">
+                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569;">
+                                        CLIENT ACCEPTANCE (NAME, SIGNATURE &amp; STAMP)
+                                    </div>
+                                    <div style="height: 55px; border-bottom: 1px dashed #94a3b8; width: 85%;"/>
+                                    <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Accepted By · Date</div>
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================================================================== -->
+    <!-- QWEB TEMPLATE B: ISANGE BRANDED COMMERCIAL / TAX / RENT INVOICE    -->
+    <!-- ================================================================== -->
+    <template id="report_isange_invoice_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 13px;">
+                        <t t-set="is_proforma" t-value="doc.state == 'draft'"/>
+                        <t t-set="is_paid" t-value="doc.payment_state in ('paid', 'in_payment')"/>
+
+                        <!-- Top Brand Banner -->
+                        <table style="width: 100%; border-collapse: collapse; background-color: #1e1b4b; color: #ffffff; border-radius: 10px 10px 0 0; overflow: hidden;">
+                            <tr>
+                                <td style="padding: 24px 28px; width: 58%; vertical-align: middle;">
+                                    <div style="font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #c4b5fd; text-transform: uppercase; margin-bottom: 4px;">
+                                        CONSTRUCTION MATERIALS · COMMERCIAL BUILDING RENTALS · FLEET
+                                    </div>
+                                    <div style="font-size: 26px; font-weight: 800; letter-spacing: 0.5px; color: #ffffff;">
+                                        <span t-out="doc.company_id.name or 'ISANGE HARDWARE'"/>
+                                    </div>
+                                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px;">
+                                        <span t-out="doc.company_id.street or 'Gisozi, Gasabo District, Kigali'"/>, <span t-out="doc.company_id.city or 'Kigali, Rwanda'"/>
+                                        · Tel: <span t-out="doc.company_id.phone or '+250 794 766 952'"/>
+                                        · <span t-out="doc.company_id.email or 'isangehardware@gmail.com'"/>
+                                        <t t-if="doc.company_id.vat"> · TIN: <span t-out="doc.company_id.vat"/></t>
+                                    </div>
+                                </td>
+                                <td style="padding: 24px 28px; width: 42%; text-align: right; vertical-align: middle;">
+                                    <t t-if="is_proforma">
+                                        <div style="display: inline-block; background-color: #f59e0b; color: #111827; font-size: 18px; font-weight: 800; padding: 8px 18px; border-radius: 8px; letter-spacing: 1px;">
+                                            PROFORMA INVOICE
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div style="display: inline-block; background-color: #7c3aed; color: #ffffff; font-size: 18px; font-weight: 800; padding: 8px 18px; border-radius: 8px; letter-spacing: 1px;">
+                                            <t t-if="doc.isange_property_id">COMMERCIAL RENT INVOICE</t>
+                                            <t t-else="">COMMERCIAL INVOICE</t>
+                                        </div>
+                                    </t>
+                                    <div style="font-size: 14px; font-weight: 700; color: #e2e8f0; margin-top: 8px;">
+                                        Invoice No: <span t-out="doc.name if doc.name and doc.name != '/' else 'DRAFT-PROFORMA'"/>
+                                    </div>
+                                    <div style="margin-top: 6px;">
+                                        <t t-if="is_paid">
+                                            <span style="background-color: #16a34a; color: #ffffff; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.8px;">
+                                                PAID IN FULL
+                                            </span>
+                                        </t>
+                                        <t t-elif="is_proforma">
+                                            <span style="background-color: #f59e0b; color: #111827; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.8px;">
+                                                PROFORMA / AWAITING CONFIRMATION
+                                            </span>
+                                        </t>
+                                        <t t-else="">
+                                            <span style="background-color: #e11d48; color: #ffffff; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.8px;">
+                                                PAYMENT DUE
+                                            </span>
+                                        </t>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="height: 5px; background-color: #7c3aed; margin-bottom: 22px;"/>
+
+                        <!-- Client & Invoice Details Two-Column Table -->
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 18px;">
+                            <tr>
+                                <td style="width: 52%; vertical-align: top; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #7c3aed; border-radius: 8px; padding: 14px 18px;">
+                                    <div style="font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #6d28d9; margin-bottom: 6px;">
+                                        <t t-if="doc.isange_property_id">BILLED TO (COMMERCIAL TENANT)</t>
+                                        <t t-else="">BILLED TO (CUSTOMER)</t>
+                                    </div>
+                                    <div style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
+                                        <span t-field="doc.partner_id.name"/>
+                                    </div>
+                                    <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+                                        <t t-if="doc.partner_id.street"><span t-field="doc.partner_id.street"/><br/></t>
+                                        <t t-if="doc.partner_id.city"><span t-field="doc.partner_id.city"/><br/></t>
+                                        <t t-if="doc.partner_id.phone"><strong>Tel:</strong> <span t-field="doc.partner_id.phone"/><br/></t>
+                                        <t t-if="doc.partner_id.email"><strong>Email:</strong> <span t-field="doc.partner_id.email"/><br/></t>
+                                        <t t-if="doc.partner_id.vat"><strong>Client TIN:</strong> <span t-field="doc.partner_id.vat"/></t>
+                                    </div>
+                                </td>
+                                <td style="width: 4%;"/>
+                                <td style="width: 44%; vertical-align: top; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 18px;">
+                                    <div style="font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #1d4ed8; margin-bottom: 8px;">
+                                        INVOICE DETAILS
+                                    </div>
+                                    <table style="width: 100%; font-size: 12.5px; line-height: 1.7;">
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Invoice Number:</td>
+                                            <td style="text-align: right; font-weight: 800; color: #0f172a;">
+                                                <span t-out="doc.name if doc.name and doc.name != '/' else 'PROFORMA'"/>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Invoice Date:</td>
+                                            <td style="text-align: right; font-weight: 700;"><span t-field="doc.invoice_date"/></td>
+                                        </tr>
+                                        <tr t-if="doc.invoice_date_due">
+                                            <td style="color: #64748b; font-weight: 600;">Due Date:</td>
+                                            <td style="text-align: right; font-weight: 700; color: #be123c;"><span t-field="doc.invoice_date_due"/></td>
+                                        </tr>
+                                        <tr t-if="doc.invoice_origin">
+                                            <td style="color: #64748b; font-weight: 600;">Source / Contract:</td>
+                                            <td style="text-align: right; font-weight: 700;"><span t-field="doc.invoice_origin"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b; font-weight: 600;">Currency:</td>
+                                            <td style="text-align: right; font-weight: 800; color: #6d28d9;"><span t-field="doc.currency_id.name"/></td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Optional Commercial Building Unit Box (shown automatically on Rent Invoices) -->
+                        <t t-if="doc.isange_property_id">
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px; background-color: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px;">
+                                <tr>
+                                    <td style="padding: 11px 16px; width: 25%;">
+                                        <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6d28d9;">DOOR / UNIT NO.</div>
+                                        <div style="font-size: 14px; font-weight: 800; color: #1e1b4b;"><span t-field="doc.isange_property_id.code"/></div>
+                                    </td>
+                                    <td style="padding: 11px 16px; width: 35%;">
+                                        <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6d28d9;">COMMERCIAL UNIT / SHOP</div>
+                                        <div style="font-size: 14px; font-weight: 800; color: #1e1b4b;"><span t-field="doc.isange_property_id.name"/></div>
+                                    </td>
+                                    <td style="padding: 11px 16px; width: 25%;">
+                                        <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6d28d9;">FLOOR / LEVEL</div>
+                                        <div style="font-size: 14px; font-weight: 700; color: #1e1b4b;"><span t-field="doc.isange_property_id.neighborhood"/></div>
+                                    </td>
+                                    <td style="padding: 11px 16px; width: 15%; text-align: right;">
+                                        <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6d28d9;">SPACE AREA</div>
+                                        <div style="font-size: 14px; font-weight: 700; color: #1e1b4b;"><span t-field="doc.isange_property_id.area_sqm"/> m²</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </t>
+
+                        <!-- Invoice Line Items Table -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px; border: 1px solid #cbd5e1;">
+                            <thead>
+                                <tr style="background-color: #1e1b4b; color: #ffffff; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px;">
+                                    <th style="padding: 11px 12px; text-align: center; width: 6%;">#</th>
+                                    <th style="padding: 11px 12px; text-align: left; width: 46%;">Description</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 12%;">Quantity</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 18%;">Unit Price</th>
+                                    <th style="padding: 11px 12px; text-align: right; width: 18%;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="row_idx" t-value="0"/>
+                                <t t-foreach="doc.invoice_line_ids" t-as="line">
+                                    <t t-if="not line.display_type or line.display_type == 'product'">
+                                        <t t-set="row_idx" t-value="row_idx + 1"/>
+                                        <tr t-attf-style="background-color: {{ '#ffffff' if row_idx % 2 == 1 else '#f8fafc' }}; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 11px 12px; text-align: center; font-weight: 700; color: #64748b;">
+                                                <span t-out="row_idx"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; font-weight: 600; color: #0f172a;">
+                                                <span t-field="line.name"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right; font-weight: 700;">
+                                                <span t-field="line.quantity"/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right;">
+                                                <span t-field="line.price_unit" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                            <td style="padding: 11px 12px; text-align: right; font-weight: 800; color: #0f172a;">
+                                                <span t-field="line.price_subtotal" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Payment Instructions & Financial Summary -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px;">
+                            <tr>
+                                <td style="width: 54%; vertical-align: top; padding-right: 20px;">
+                                    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #16a34a; border-radius: 8px; padding: 14px 16px;">
+                                        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #15803d; margin-bottom: 6px;">
+                                            ACCEPTED PAYMENT CHANNELS
+                                        </div>
+                                        <div style="font-size: 12px; color: #334155; line-height: 1.6;">
+                                            <strong>1. MTN MoMo / Mobile Money:</strong> Pay to <strong>Isange Hardware</strong> (Journal: <em>MTN MoMo / Mobile Money</em>).<br/>
+                                            <strong>2. Bank Transfer / Deposit:</strong> Account Name: <strong>Isange Hardware</strong>.<br/>
+                                            <strong>3. Cash at Counter:</strong> Official receipt issued upon payment.<br/>
+                                            <em>Please quote Invoice No. <strong><span t-out="doc.name if doc.name and doc.name != '/' else 'PROFORMA'"/></strong> as your payment reference.</em>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="width: 46%; vertical-align: top;">
+                                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                                        <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 10px 16px; color: #475569; font-weight: 600;">Subtotal (Untaxed)</td>
+                                            <td style="padding: 10px 16px; text-align: right; font-weight: 700;">
+                                                <span t-field="doc.amount_untaxed" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 10px 16px; color: #475569; font-weight: 600;">Taxes (VAT)</td>
+                                            <td style="padding: 10px 16px; text-align: right; font-weight: 700;">
+                                                <span t-field="doc.amount_tax" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #1e1b4b; color: #ffffff; font-size: 15px;">
+                                            <td style="padding: 12px 16px; font-weight: 800;">TOTAL INVOICE</td>
+                                            <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: #c4b5fd;">
+                                                <span t-field="doc.amount_total" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #fef2f2; border-top: 1px solid #fecdd3; font-size: 14px;">
+                                            <td style="padding: 11px 16px; font-weight: 800; color: #be123c;">BALANCE DUE</td>
+                                            <td style="padding: 11px 16px; text-align: right; font-weight: 800; color: #be123c;">
+                                                <span t-field="doc.amount_residual" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Signature & Stamp Block -->
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 18px;">
+                            <tr>
+                                <td style="width: 48%; padding-top: 16px;">
+                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569;">
+                                        FOR ISANGE HARDWARE (AUTHORIZED SIGNATURE &amp; STAMP)
+                                    </div>
+                                    <div style="height: 55px; border-bottom: 1px dashed #94a3b8; width: 85%;"/>
+                                    <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Authorized Signatory · Date</div>
+                                </td>
+                                <td style="width: 4%;"/>
+                                <td style="width: 48%; padding-top: 16px;">
+                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569;">
+                                        RECEIVED BY (CLIENT / TENANT SIGNATURE)
+                                    </div>
+                                    <div style="height: 55px; border-bottom: 1px dashed #94a3b8; width: 85%;"/>
+                                    <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Signature · Date</div>
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+
+    <!-- Enhance Standard Odoo Quotation & Pro-Forma Invoice (Framed Client Box, Salesperson Fallback & Whole-RWF Unit Price — Clean Layout Without Terms Table) -->
+    <template id="report_saleorder_document_inherit_isange_pro" inherit_id="sale.report_saleorder_document">
+        <xpath expr="//t[@t-set='address']" position="replace">
+            <t t-set="address">
+                <div style="border: 1px solid #cbd5e1; border-left: 3px solid #1b365d; border-radius: 4px; background-color: #f8fafc; padding: 8px 12px; font-size: 11px; line-height: 1.45;">
+                    <div style="font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: #1b365d; margin-bottom: 3px;">
+                        <span t-if="env.context.get('proforma', False) or is_pro_forma">Pro-Forma Issued To</span>
+                        <span t-else="">Prepared For</span>
+                    </div>
+                    <div style="font-size: 12.5px; font-weight: 700; color: #0f172a; margin-bottom: 2px;" t-field="doc.partner_id.name"/>
+                    <div t-if="doc.partner_id.street or doc.partner_id.city" style="color: #475569;">
+                        <span t-if="doc.partner_id.street" t-field="doc.partner_id.street"/>
+                        <t t-if="doc.partner_id.street and doc.partner_id.city">, </t>
+                        <span t-if="doc.partner_id.city" t-field="doc.partner_id.city"/>
+                    </div>
+                    <div t-if="doc.partner_id.phone" style="color: #475569;">Tel: <span t-field="doc.partner_id.phone"/></div>
+                    <div t-if="doc.partner_id.email" style="color: #475569;"><span t-field="doc.partner_id.email"/></div>
+                    <div t-if="doc.partner_id.vat" style="color: #0f172a; font-weight: 600; margin-top: 2px;">
+                        <t t-if="doc.company_id.account_fiscal_country_id.vat_label" t-out="doc.company_id.account_fiscal_country_id.vat_label"/>
+                        <t t-else="">TIN</t>: <span t-field="doc.partner_id.vat"/>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+
+        <xpath expr="//div[@id='informations']//div[@t-if='doc.user_id.name']/div[@t-field='doc.user_id']" position="replace">
+            <div>
+                <span t-if="doc.user_id.name in ('Administrator', 'Mitchell Admin')">Isange Hardware Sales</span>
+                <span t-else="" t-field="doc.user_id"/>
+            </div>
+        </xpath>
+
+        <xpath expr="//td[@name='td_product_priceunit']" position="replace">
+            <td name="td_product_priceunit" class="text-end text-nowrap">
+                <span t-if="not collapse_prices and line.discount &lt; 0" t-out="(1 - line.discount / 100.0) * line.price_unit" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                <span t-elif="not collapse_prices" t-field="line.price_unit" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+            </td>
+        </xpath>
+    </template>
+
+    <!-- Enhance Standard Odoo Invoice (Document Layout) with Commercial Building Unit Details -->
+    <template id="report_invoice_document_inherit_isange" inherit_id="account.report_invoice_document">
+        <xpath expr="//div[@id='informations']" position="after">
+            <t t-if="o.isange_property_id">
+                <div class="row mt-2 mb-3 p-2 rounded border" style="background-color: #f8fafc;">
+                    <div class="col-3">
+                        <strong>Unit / Door No.:</strong><br/>
+                        <span t-field="o.isange_property_id.code"/>
+                    </div>
+                    <div class="col-4">
+                        <strong>Commercial Unit / Space:</strong><br/>
+                        <span t-field="o.isange_property_id.name"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Floor / Level:</strong><br/>
+                        <span t-field="o.isange_property_id.neighborhood"/>
+                    </div>
+                    <div class="col-2">
+                        <strong>Area:</strong><br/>
+                        <span t-field="o.isange_property_id.area_sqm"/> m²
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- 1-Click Print Invoice Button (using standard Odoo Document Layout) on Invoice Form -->
+    <record id="account_move_form_inherit_isange_branded_invoice" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.isange.branded.invoice</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="%(account.account_invoices)d"
+                    string="Print Invoice (PDF)"
+                    type="action"
+                    class="btn-secondary"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- QWeb Template: All-in-One Executive Business Report -->
+    <template id="report_all_in_one_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <t t-set="all_properties" t-value="docs.env['isange.property'].search([])"/>
+                    <t t-set="all_leases" t-value="docs.env['isange.lease'].search([])"/>
+                    <t t-set="all_expenses" t-value="docs.env['isange.property.expense'].search([('state', '=', 'approved')])"/>
+                    <t t-set="all_trips" t-value="docs.env['isange.vehicle.trip'].search([('state', '!=', 'cancelled')])"/>
+                    <t t-set="all_sales" t-value="docs.env['sale.order'].search([('state', 'in', ('sale', 'done'))])"/>
+                    <t t-set="all_pos" t-value="docs.env['pos.order'].search([('state', 'in', ('paid', 'done', 'invoiced'))])"/>
+                    <t t-set="all_purchases" t-value="docs.env['purchase.order'].search([('state', 'in', ('purchase', 'done'))])"/>
+
+                    <t t-set="tot_sales" t-value="sum(all_sales.mapped('amount_total')) + sum(all_pos.mapped('amount_total'))"/>
+                    <t t-set="tot_purchases" t-value="sum(all_purchases.mapped('amount_total'))"/>
+                    <t t-set="tot_rent_invoiced" t-value="sum(all_properties.mapped('total_invoiced'))"/>
+                    <t t-set="tot_prop_expenses" t-value="sum(all_properties.mapped('total_expenses'))"/>
+                    <t t-set="tot_prop_profit" t-value="sum(all_properties.mapped('net_profit'))"/>
+                    <t t-set="tot_trip_cost" t-value="sum(all_trips.mapped('total_cost'))"/>
+                    <t t-set="tot_trip_fees" t-value="sum(all_trips.mapped('delivery_fee'))"/>
+
+                    <h2 class="mb-2">Isange Hardware — All-in-One Executive Business Report</h2>
+                    <p class="text-muted mb-4">
+                        Unified performance summary across Construction &amp; Hardware Sales, Commercial Building Rentals, and Vehicle Operations.
+                    </p>
+
+                    <h4 class="mt-3 mb-2">1. Overall Business Summary</h4>
+                    <table class="table table-sm table-bordered mb-4">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Business Line</th>
+                                <th class="text-end">Revenue / Inflow</th>
+                                <th class="text-end">Costs &amp; Expenses</th>
+                                <th class="text-end">Net Contribution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>1. Construction &amp; Hardware Store</strong> (Confirmed Sales + POS vs. Purchases)</td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_sales)"/></td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_purchases)"/></td>
+                                <td class="text-end"><strong><span t-out="'{:,.0f}'.format(tot_sales - tot_purchases)"/></strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>2. Commercial Building Rentals</strong> (Rent Invoiced vs. Building Repairs &amp; Utilities)</td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_rent_invoiced)"/></td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_prop_expenses)"/></td>
+                                <td class="text-end"><strong><span t-out="'{:,.0f}'.format(tot_prop_profit)"/></strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>3. Vehicle &amp; Delivery Operations</strong> (Delivery Fees vs. Fuel &amp; Trip Costs)</td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_trip_fees)"/></td>
+                                <td class="text-end"><span t-out="'{:,.0f}'.format(tot_trip_cost)"/></td>
+                                <td class="text-end"><strong><span t-out="'{:,.0f}'.format(tot_trip_fees - tot_trip_cost)"/></strong></td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>TOTAL COMPANY POSITION</th>
+                                <th class="text-end"><span t-out="'{:,.0f}'.format(tot_sales + tot_rent_invoiced + tot_trip_fees)"/></th>
+                                <th class="text-end"><span t-out="'{:,.0f}'.format(tot_purchases + tot_prop_expenses + tot_trip_cost)"/></th>
+                                <th class="text-end"><span t-out="'{:,.0f}'.format((tot_sales + tot_rent_invoiced + tot_trip_fees) - (tot_purchases + tot_prop_expenses + tot_trip_cost))"/></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <h4 class="mt-4 mb-2">2. Commercial Building Units &amp; Rent Breakdown</h4>
+                    <table class="table table-sm table-bordered mb-4">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Door / Unit No.</th>
+                                <th>Commercial Unit / Space</th>
+                                <th>Floor / Wing</th>
+                                <th>Status</th>
+                                <th>Current Tenant</th>
+                                <th class="text-end">Monthly Rent</th>
+                                <th class="text-end">Rent Invoiced</th>
+                                <th class="text-end">Repairs &amp; Costs</th>
+                                <th class="text-end">Net Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="all_properties" t-as="prop">
+                                <tr>
+                                    <td><span t-field="prop.code"/></td>
+                                    <td><span t-field="prop.name"/></td>
+                                    <td><span t-field="prop.neighborhood"/></td>
+                                    <td><span t-field="prop.state"/></td>
+                                    <td><span t-field="prop.current_tenant_id.name"/></td>
+                                    <td class="text-end"><span t-field="prop.monthly_rent"/></td>
+                                    <td class="text-end"><span t-field="prop.total_invoiced"/></td>
+                                    <td class="text-end"><span t-field="prop.total_expenses"/></td>
+                                    <td class="text-end"><strong><span t-field="prop.net_profit"/></strong></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+
+                    <h4 class="mt-4 mb-2">3. Vehicle Operations &amp; Delivery Trips</h4>
+                    <table class="table table-sm table-bordered mb-4">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Trip Ref</th>
+                                <th>Date</th>
+                                <th>Vehicle</th>
+                                <th>Driver</th>
+                                <th>Destination</th>
+                                <th class="text-end">Distance (km)</th>
+                                <th class="text-end">Fuel Cost</th>
+                                <th class="text-end">Total Cost</th>
+                                <th class="text-end">Delivery Fee</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="all_trips" t-as="trip">
+                                <tr>
+                                    <td><span t-field="trip.name"/></td>
+                                    <td><span t-field="trip.date"/></td>
+                                    <td><span t-field="trip.vehicle_id.name"/></td>
+                                    <td><span t-field="trip.driver_id.name"/></td>
+                                    <td><span t-field="trip.destination_location"/></td>
+                                    <td class="text-end"><span t-field="trip.distance_km"/></td>
+                                    <td class="text-end"><span t-field="trip.fuel_cost"/></td>
+                                    <td class="text-end"><span t-field="trip.total_cost"/></td>
+                                    <td class="text-end"><span t-field="trip.delivery_fee"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <!-- QWeb Template: Commercial Lease Contract & Rent Proforma Statement -->
+    <template id="report_lease_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 13px;">
+                        <table style="width: 100%; border-collapse: collapse; background-color: #1e1b4b; color: #ffffff; border-radius: 10px 10px 0 0; overflow: hidden;">
+                            <tr>
+                                <td style="padding: 22px 26px; width: 60%;">
+                                    <div style="font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fbbf24;">ISANGE COMMERCIAL BUILDING</div>
+                                    <div style="font-size: 24px; font-weight: 800; color: #ffffff;"><span t-out="doc.company_id.name or 'ISANGE HARDWARE'"/></div>
+                                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
+                                        <span t-out="doc.company_id.street or 'Gisozi, Gasabo District, Kigali'"/> · Tel: <span t-out="doc.company_id.phone or '+250 794 766 952'"/>
+                                    </div>
+                                </td>
+                                <td style="padding: 22px 26px; width: 40%; text-align: right;">
+                                    <div style="display: inline-block; background-color: #f59e0b; color: #111827; font-size: 15px; font-weight: 800; padding: 7px 14px; border-radius: 8px;">
+                                        RENT PROFORMA &amp; LEASE
+                                    </div>
+                                    <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 6px;">
+                                        Contract: <span t-field="doc.name"/>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="height: 4px; background-color: #f59e0b; margin-bottom: 20px;"/>
+
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px;">
+                            <tr>
+                                <td style="width: 48%; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #7c3aed; border-radius: 8px; padding: 14px 16px; vertical-align: top;">
+                                    <div style="font-size: 10.5px; font-weight: 800; color: #6d28d9; text-transform: uppercase; margin-bottom: 6px;">COMMERCIAL TENANT &amp; UNIT</div>
+                                    <div style="font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 4px;"><span t-field="doc.tenant_id.name"/></div>
+                                    <div><strong>Unit / Shop:</strong> <span t-field="doc.property_id.name"/> (Door: <strong><span t-field="doc.property_id.code"/></strong>)</div>
+                                    <div><strong>Floor / Level:</strong> <span t-field="doc.property_id.neighborhood"/> (<span t-field="doc.property_id.area_sqm"/> m²)</div>
+                                </td>
+                                <td style="width: 4%;"/>
+                                <td style="width: 48%; background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 16px; vertical-align: top;">
+                                    <div style="font-size: 10.5px; font-weight: 800; color: #b45309; text-transform: uppercase; margin-bottom: 6px;">LEASE &amp; RENT SCHEDULE</div>
+                                    <div><strong>Start Date:</strong> <span t-field="doc.date_start"/></div>
+                                    <div><strong>Next Rent Due:</strong> <span t-field="doc.next_invoice_date"/></div>
+                                    <div><strong>Payment Cycle:</strong> <span t-field="doc.billing_cycle"/></div>
+                                    <div><strong>Rent per Cycle:</strong> <strong><span t-field="doc.rent_amount"/></strong></div>
+                                    <div><strong>Security Deposit:</strong> <span t-field="doc.deposit_amount"/></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <t t-if="doc.terms">
+                            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+                                <strong style="color: #b45309;">Lease Terms &amp; Payment Rules:</strong>
+                                <div t-field="doc.terms" style="margin-top: 4px;"/>
+                            </div>
+                        </t>
+
+                        <h4 style="font-size: 14px; font-weight: 800; color: #1e1b4b; margin-bottom: 8px;">Rent Invoices &amp; Statement History</h4>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1;">
+                            <thead>
+                                <tr style="background-color: #1e1b4b; color: #ffffff; font-size: 11.5px;">
+                                    <th style="padding: 9px 12px; text-align: left;">Invoice Number</th>
+                                    <th style="padding: 9px 12px; text-align: left;">Invoice Date</th>
+                                    <th style="padding: 9px 12px; text-align: left;">Payment Status</th>
+                                    <th style="padding: 9px 12px; text-align: right;">Total Amount</th>
+                                    <th style="padding: 9px 12px; text-align: right;">Balance Due</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="doc.invoice_ids" t-as="inv">
+                                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <td style="padding: 9px 12px; font-weight: 700;"><span t-field="inv.name"/></td>
+                                        <td style="padding: 9px 12px;"><span t-field="inv.invoice_date"/></td>
+                                        <td style="padding: 9px 12px;"><span t-field="inv.payment_state"/></td>
+                                        <td style="padding: 9px 12px; text-align: right; font-weight: 700;"><span t-field="inv.amount_total"/></td>
+                                        <td style="padding: 9px 12px; text-align: right; font-weight: 800; color: #be123c;"><span t-field="inv.amount_residual"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                        <t t-call="isange_property_fleet.report_bank_details_block"/>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- ========================================== -->
+    <!-- 1. COMMERCIAL BUILDING UNIT VIEWS          -->
+    <!-- ========================================== -->
+
+    <record id="isange_property_view_form" model="ir.ui.view">
+        <field name="name">isange.property.form</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <form string="Commercial Building Unit / Space">
+                <header>
+                    <button name="%(action_isange_quick_new_lease)d" string="Rent Out Unit (New Lease)" type="action"
+                        class="btn-primary" invisible="state == 'occupied'"/>
+                    <button name="%(action_isange_quick_new_expense)d" string="Log Building Repair / Utility Bill" type="action"
+                        class="btn-secondary"/>
+                    <button name="%(action_report_all_in_one_property)d" string="Print All-in-One Business Report (PDF)" type="action"
+                        class="btn-secondary"/>
+                    <button name="action_set_vacant" string="Mark Vacant" type="object"
+                        class="btn-secondary" invisible="state == 'vacant'"/>
+                    <button name="action_set_maintenance" string="Set Under Maintenance" type="object"
+                        class="btn-secondary" invisible="state == 'maintenance'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="vacant,occupied,maintenance"/>
+                </header>
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_leases" type="object" class="oe_stat_button" icon="fa-file-text-o">
+                            <field name="lease_count" widget="statinfo" string="Leases"/>
+                        </button>
+                        <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o">
+                            <field name="invoice_count" widget="statinfo" string="Rent Invoices"/>
+                        </button>
+                        <button name="action_view_expenses" type="object" class="oe_stat_button" icon="fa-wrench">
+                            <field name="expense_count" widget="statinfo" string="Repairs &amp; Costs"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Commercial Unit / Shop / Office Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Ground Floor — Shop G-01"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="1. Building Unit &amp; Tenant">
+                            <field name="code" string="Unit / Door No." placeholder="e.g. G-01, 101, B-01"/>
+                            <field name="neighborhood" string="Floor / Level" placeholder="e.g. Ground Floor, 1st Floor, Basement"/>
+                            <field name="property_type" string="Space Type"/>
+                            <field name="area_sqm" string="Space Area (sq.m)"/>
+                            <field name="current_tenant_id" string="Current Tenant" readonly="1" widget="many2one_avatar"/>
+                            <field name="street" string="Building Name / Location" placeholder="Isange Commercial Building"/>
+                            <field name="city"/>
+                        </group>
+                        <group string="2. Rent Pricing &amp; Unit Profit Summary">
+                            <field name="monthly_rent" string="Monthly Rent"/>
+                            <field name="security_deposit" string="Security Deposit / Caution"/>
+                            <field name="total_invoiced" string="Total Rent Invoiced"/>
+                            <field name="total_expenses" string="Unit Repairs &amp; Costs"/>
+                            <field name="net_profit" string="Net Unit Profit" decoration-success="net_profit &gt; 0" decoration-danger="net_profit &lt; 0"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tenant Leases" name="leases">
+                            <field name="lease_ids">
+                                <list string="Tenant Leases">
+                                    <field name="name" decoration-bf="1"/>
+                                    <field name="tenant_id" widget="many2one_avatar"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="billing_cycle" widget="badge"/>
+                                    <field name="rent_amount" decoration-bf="1"/>
+                                    <field name="next_invoice_date"/>
+                                    <field name="state" widget="badge"
+                                        decoration-success="state == 'active'"
+                                        decoration-info="state == 'draft'"
+                                        decoration-muted="state in ('expired', 'terminated')"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Unit Repairs &amp; Expenses" name="expenses">
+                            <field name="expense_ids">
+                                <list string="Building Maintenance &amp; Expenses" editable="bottom">
+                                    <field name="date"/>
+                                    <field name="name" decoration-bf="1"/>
+                                    <field name="expense_type" widget="badge"/>
+                                    <field name="vendor_id"/>
+                                    <field name="amount" sum="Total Expenses" decoration-bf="1"/>
+                                    <field name="state" widget="badge" decoration-success="state == 'approved'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Meters &amp; Space Specifications" name="specs">
+                            <group>
+                                <group>
+                                    <field name="furnished" string="Fitted / Partitioned"/>
+                                    <field name="bathrooms" string="Private Washrooms"/>
+                                </group>
+                            </group>
+                            <field name="notes" placeholder="Enter CASHPOWER electricity meter number, water meter number, or unit specifications..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="isange_property_view_list" model="ir.ui.view">
+        <field name="name">isange.property.list</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <list string="Commercial Building Units &amp; Spaces"
+                decoration-success="state == 'occupied'"
+                decoration-warning="state == 'maintenance'"
+                sample="1">
+                <field name="code" string="Door / Unit No." decoration-bf="1"/>
+                <field name="name" string="Unit / Shop / Office" decoration-bf="1"/>
+                <field name="neighborhood" string="Floor / Level" widget="badge" decoration-info="1"/>
+                <field name="property_type" string="Space Type" widget="badge"/>
+                <field name="area_sqm" string="Area (sq.m)" sum="Total Area (sq.m)" optional="show"/>
+                <field name="current_tenant_id" string="Current Tenant" widget="many2one_avatar"/>
+                <field name="monthly_rent" string="Monthly Rent" sum="Total Monthly Rent" decoration-bf="1"/>
+                <field name="total_invoiced" string="Total Invoiced" sum="Total Invoiced" optional="show"/>
+                <field name="total_expenses" string="Repairs &amp; Costs" sum="Total Expenses" optional="show"/>
+                <field name="net_profit" string="Net Profit" sum="Total Net Profit" decoration-bf="1"
+                    decoration-success="net_profit &gt; 0" decoration-danger="net_profit &lt; 0"/>
+                <field name="state" widget="badge"
+                    decoration-success="state == 'occupied'"
+                    decoration-info="state == 'vacant'"
+                    decoration-warning="state == 'maintenance'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="isange_property_view_kanban" model="ir.ui.view">
+        <field name="name">isange.property.kanban</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" sample="1">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="property_type"/>
+                <field name="neighborhood"/>
+                <field name="area_sqm"/>
+                <field name="state"/>
+                <field name="monthly_rent"/>
+                <field name="current_tenant_id"/>
+                <field name="net_profit"/>
+                <templates>
+                    <t t-name="card">
+                        <main class="o_isange_unit_card">
+                            <div class="o_isange_unit_header">
+                                <span class="o_isange_door_badge">
+                                    <i class="fa fa-key"/>
+                                    <field name="code"/>
+                                </span>
+                                <field name="state" widget="badge"
+                                    decoration-success="state == 'occupied'"
+                                    decoration-info="state == 'vacant'"
+                                    decoration-warning="state == 'maintenance'"/>
+                            </div>
+
+                            <div class="fw-bold fs-5 mb-2">
+                                <field name="name"/>
+                            </div>
+
+                            <div class="o_isange_meta_pills">
+                                <span class="o_isange_meta_pill">
+                                    <i class="fa fa-building-o text-info"/>
+                                    <field name="neighborhood"/>
+                                </span>
+                                <span class="o_isange_meta_pill">
+                                    <i class="fa fa-arrows-alt text-warning"/>
+                                    <field name="area_sqm"/> m²
+                                </span>
+                            </div>
+
+                            <div class="o_isange_kpi_box">
+                                <div>
+                                    <div class="o_isange_kpi_lbl">Monthly Rent</div>
+                                    <div class="o_isange_kpi_val text-primary">
+                                        <field name="monthly_rent" widget="monetary"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="o_isange_kpi_lbl">Net Profit</div>
+                                    <div class="o_isange_kpi_val text-success">
+                                        <field name="net_profit" widget="monetary"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <footer class="pt-2 mt-1 border-top d-flex justify-content-between align-items-center">
+                                <div t-if="record.current_tenant_id.raw_value" class="small fw-semibold">
+                                    <i class="fa fa-user-circle text-success me-1"/>
+                                    <field name="current_tenant_id"/>
+                                </div>
+                                <div t-else="" class="small text-info fw-semibold">
+                                    <i class="fa fa-check-circle me-1"/>Ready for Tenant
+                                </div>
+                                <button t-if="record.state.raw_value == 'vacant'"
+                                    name="%(action_isange_quick_new_lease)d"
+                                    type="action"
+                                    class="btn btn-sm btn-primary py-0 px-2">
+                                    Rent Out
+                                </button>
+                            </footer>
+                        </main>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="isange_property_view_pivot" model="ir.ui.view">
+        <field name="name">isange.property.pivot</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <pivot string="Commercial Building Units &amp; Profit Analysis" sample="1">
+                <field name="neighborhood" string="Floor / Level" type="row"/>
+                <field name="name" string="Commercial Unit" type="row"/>
+                <field name="state" type="col"/>
+                <field name="monthly_rent" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="isange_property_view_graph" model="ir.ui.view">
+        <field name="name">isange.property.graph</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <graph string="Commercial Building Rent by Floor &amp; Unit" type="bar" sample="1">
+                <field name="neighborhood" string="Floor / Level"/>
+                <field name="monthly_rent" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="isange_property_view_search" model="ir.ui.view">
+        <field name="name">isange.property.search</field>
+        <field name="model">isange.property</field>
+        <field name="arch" type="xml">
+            <search string="Search Commercial Building Units">
+                <field name="name" string="Unit Name"/>
+                <field name="code" string="Unit / Door No."/>
+                <field name="current_tenant_id" string="Tenant"/>
+                <field name="neighborhood" string="Floor / Level"/>
+                <filter string="Vacant / Available Units" name="filter_vacant" domain="[('state', '=', 'vacant')]"/>
+                <filter string="Occupied / Rented Units" name="filter_occupied" domain="[('state', '=', 'occupied')]"/>
+                <filter string="Under Maintenance" name="filter_maintenance" domain="[('state', '=', 'maintenance')]"/>
+                <group>
+                    <filter string="Floor / Level" name="group_neighborhood" context="{'group_by': 'neighborhood'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Space Type" name="group_type" context="{'group_by': 'property_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_isange_property" model="ir.actions.act_window">
+        <field name="name">1. Commercial Building Units</field>
+        <field name="res_model">isange.property</field>
+        <field name="view_mode">kanban,list,pivot,graph,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a Shop, Office, Showroom, or Storage Unit in the Commercial Building
+            </p>
+            <p>
+                <strong>How it works:</strong><br/>
+                1. Click <strong>New</strong> to register a commercial unit (Door No., Floor, Area, Monthly Rent).<br/>
+                2. Click <strong>Rent Out Unit (New Lease)</strong> to assign a commercial tenant.<br/>
+                3. Click <strong>Print All-in-One Business Report (PDF)</strong> anytime to print your full company summary!
+            </p>
+        </field>
+    </record>
+
+    <!-- ========================================== -->
+    <!-- 2. TENANT LEASE VIEWS                      -->
+    <!-- ========================================== -->
+
+    <record id="isange_lease_view_form" model="ir.ui.view">
+        <field name="name">isange.lease.form</field>
+        <field name="model">isange.lease</field>
+        <field name="arch" type="xml">
+            <form string="Commercial Tenant Lease Contract">
+                <header>
+                    <button name="action_activate" string="1. Activate Lease (Move In Tenant)" type="object"
+                        class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_create_invoice" string="2. Create Rent Invoice" type="object"
+                        class="btn-primary" invisible="state != 'active'"/>
+                    <button name="%(action_report_tenant_lease_pdf)d" string="Print Rent Proforma &amp; Statement (PDF)" type="action"
+                        class="btn-secondary"/>
+                    <button name="action_terminate" string="End / Terminate Lease" type="object"
+                        class="btn-secondary" invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,terminated"/>
+                </header>
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o">
+                            <field name="invoice_count" widget="statinfo" string="Rent Invoices"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="1. Commercial Unit &amp; Tenant">
+                            <field name="property_id" string="Commercial Unit / Shop"/>
+                            <field name="tenant_id" string="Commercial Tenant" widget="many2one_avatar"/>
+                            <field name="billing_cycle"/>
+                        </group>
+                        <group string="2. Rent &amp; Dates">
+                            <field name="rent_amount"/>
+                            <field name="deposit_amount" string="Security Deposit / Caution"/>
+                            <field name="deposit_paid"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="next_invoice_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lease Terms &amp; Agreement" name="terms">
+                            <field name="terms" placeholder="Enter commercial lease terms, electricity/water billing rules, notice period..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="isange_lease_view_list" model="ir.ui.view">
+        <field name="name">isange.lease.list</field>
+        <field name="model">isange.lease</field>
+        <field name="arch" type="xml">
+            <list string="Commercial Tenant Leases"
+                decoration-success="state == 'active'"
+                decoration-muted="state in ('expired', 'terminated')"
+                sample="1">
+                <field name="name" decoration-bf="1"/>
+                <field name="property_id" string="Commercial Unit / Shop" decoration-bf="1"/>
+                <field name="tenant_id" string="Tenant" widget="many2one_avatar"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="billing_cycle" widget="badge" decoration-info="1"/>
+                <field name="rent_amount" sum="Total Rent" decoration-bf="1"/>
+                <field name="deposit_paid" widget="boolean_toggle" optional="show"/>
+                <field name="next_invoice_date" decoration-bf="1"/>
+                <field name="state" widget="badge"
+                    decoration-success="state == 'active'"
+                    decoration-info="state == 'draft'"
+                    decoration-muted="state in ('expired', 'terminated')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="isange_lease_view_pivot" model="ir.ui.view">
+        <field name="name">isange.lease.pivot</field>
+        <field name="model">isange.lease</field>
+        <field name="arch" type="xml">
+            <pivot string="Commercial Leases &amp; Rent Analysis" sample="1">
+                <field name="property_id" string="Commercial Unit" type="row"/>
+                <field name="tenant_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="rent_amount" type="measure"/>
+                <field name="deposit_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="isange_lease_view_graph" model="ir.ui.view">
+        <field name="name">isange.lease.graph</field>
+        <field name="model">isange.lease</field>
+        <field name="arch" type="xml">
+            <graph string="Commercial Leases &amp; Rent Analysis" type="bar" sample="1">
+                <field name="property_id" string="Commercial Unit"/>
+                <field name="rent_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_isange_lease" model="ir.actions.act_window">
+        <field name="name">2. Tenant Leases &amp; Rent</field>
+        <field name="res_model">isange.lease</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a Commercial Tenant Lease Contract
+            </p>
+            <p>
+                Select the Commercial Unit and Tenant, click <strong>1. Activate Lease</strong>, and then click <strong>2. Create Rent Invoice</strong> whenever rent is due.
+            </p>
+        </field>
+    </record>
+
+    <!-- ========================================== -->
+    <!-- 3. BUILDING MAINTENANCE & EXPENSE VIEWS    -->
+    <!-- ========================================== -->
+
+    <record id="isange_property_expense_view_form" model="ir.ui.view">
+        <field name="name">isange.property.expense.form</field>
+        <field name="model">isange.property.expense</field>
+        <field name="arch" type="xml">
+            <form string="Building Repair &amp; Utility Expense">
+                <header>
+                    <button name="action_approve" string="Mark Paid / Approved" type="object"
+                        class="btn-primary" invisible="state == 'approved'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approved"/>
+                </header>
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <group>
+                        <group string="1. Commercial Unit &amp; Expense Details">
+                            <field name="property_id" string="Commercial Unit / Space"/>
+                            <field name="name" placeholder="e.g. Common area electricity / Plumbing / Security"/>
+                            <field name="expense_type"/>
+                        </group>
+                        <group string="2. Cost &amp; Vendor">
+                            <field name="date"/>
+                            <field name="vendor_id" widget="many2one_avatar"/>
+                            <field name="amount"/>
+                        </group>
+                    </group>
+                    <field name="notes" placeholder="Any extra details or receipt numbers..."/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="isange_property_expense_view_list" model="ir.ui.view">
+        <field name="name">isange.property.expense.list</field>
+        <field name="model">isange.property.expense</field>
+        <field name="arch" type="xml">
+            <list string="Building Repairs &amp; Expenses" sample="1">
+                <field name="date"/>
+                <field name="property_id" string="Commercial Unit / Space" decoration-bf="1"/>
+                <field name="name" decoration-bf="1"/>
+                <field name="expense_type" widget="badge" decoration-warning="expense_type == 'repair'" decoration-info="expense_type == 'utility'"/>
+                <field name="vendor_id" widget="many2one_avatar"/>
+                <field name="amount" sum="Total Cost" decoration-bf="1"/>
+                <field name="state" widget="badge" decoration-success="state == 'approved'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="isange_property_expense_view_pivot" model="ir.ui.view">
+        <field name="name">isange.property.expense.pivot</field>
+        <field name="model">isange.property.expense</field>
+        <field name="arch" type="xml">
+            <pivot string="Building Repairs &amp; Costs Analysis" sample="1">
+                <field name="property_id" string="Commercial Unit" type="row"/>
+                <field name="expense_type" type="col"/>
+                <field name="amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="isange_property_expense_view_graph" model="ir.ui.view">
+        <field name="name">isange.property.expense.graph</field>
+        <field name="model">isange.property.expense</field>
+        <field name="arch" type="xml">
+            <graph string="Building Repairs &amp; Costs Analysis" type="bar" sample="1">
+                <field name="property_id" string="Commercial Unit"/>
+                <field name="expense_type"/>
+                <field name="amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_isange_property_expense" model="ir.actions.act_window">
+        <field name="name">3. Building Repairs &amp; Costs</field>
+        <field name="res_model">isange.property.expense</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Log a Commercial Building Repair, Security, Cleaning, or Utility Bill
+            </p>
+            <p>
+                Record electrical, plumbing, cleaning, security, or tax costs for any unit in the commercial building. Costs are automatically deducted from the unit's Net Profit.
+            </p>
+        </field>
+    </record>
+
+    <!-- ========================================== -->
+    <!-- 4. ALL-IN-ONE REPORT ACTIONS               -->
+    <!-- ========================================== -->
+
+    <record id="action_report_isange_property_profit" model="ir.actions.act_window">
+        <field name="name">1. Commercial Building Units &amp; Profit Report</field>
+        <field name="res_model">isange.property</field>
+        <field name="view_mode">list,pivot,graph,kanban,form</field>
+    </record>
+
+    <record id="action_report_isange_lease" model="ir.actions.act_window">
+        <field name="name">2. Commercial Leases &amp; Rent Roll Report</field>
+        <field name="res_model">isange.lease</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+    </record>
+
+    <record id="action_report_isange_property_expense" model="ir.actions.act_window">
+        <field name="name">3. Building Repairs &amp; Expenses Report</field>
+        <field name="res_model">isange.property.expense</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+    </record>
+
+    <record id="action_report_isange_sales" model="ir.actions.act_window">
+        <field name="name">5. Construction &amp; Hardware Sales Report</field>
+        <field name="res_model">sale.report</field>
+        <field name="view_mode">graph,pivot</field>
+    </record>
+
+    <record id="action_report_isange_purchases" model="ir.actions.act_window">
+        <field name="name">6. Supplier Material Purchases Report</field>
+        <field name="res_model">purchase.report</field>
+        <field name="view_mode">graph,pivot</field>
+    </record>
+
+    <record id="action_report_isange_invoices" model="ir.actions.act_window">
+        <field name="name">7. All Company Invoices &amp; Bills Report</field>
+        <field name="res_model">account.invoice.report</field>
+        <field name="view_mode">graph,pivot</field>
+    </record>
+
+    <record id="action_report_isange_fleet_services" model="ir.actions.act_window">
+        <field name="name">8. Vehicle Maintenance &amp; Service Costs Report</field>
+        <field name="res_model">fleet.vehicle.log.services</field>
+        <field name="view_mode">list,graph,pivot,form</field>
+    </record>
+
+</odoo>

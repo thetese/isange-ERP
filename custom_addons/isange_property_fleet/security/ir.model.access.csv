@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_isange_property_user,isange.property.user,model_isange_property,base.group_user,1,1,1,1
+access_isange_lease_user,isange.lease.user,model_isange_lease,base.group_user,1,1,1,1
+access_isange_property_expense_user,isange.property.expense.user,model_isange_property_expense,base.group_user,1,1,1,1
+access_isange_vehicle_trip_user,isange.vehicle.trip.user,model_isange_vehicle_trip,base.group_user,1,1,1,1

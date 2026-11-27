@@ -1,0 +1,53 @@
+// ============================================================================
+// ISANGE COMMAND CENTER — DARK MODE TOKENS (LINEAR / STRIPE DARK PALETTE)
+// Loaded in the web.assets_web_dark bundle.
+// ============================================================================
+
+div.o_isange_dashboard {
+    --isg-bg: #0b0d13;
+    --isg-surface: #12151e;
+    --isg-surface-subtle: #181c27;
+    --isg-surface-elevated: #151923;
+    --isg-surface-hover: #1c212e;
+    --isg-border: rgba(255, 255, 255, 0.08);
+    --isg-border-strong: rgba(255, 255, 255, 0.16);
+    --isg-border-soft: rgba(255, 255, 255, 0.05);
+    --isg-text-strong: #f8fafc;
+    --isg-text: #cbd5e1;
+    --isg-text-muted: #8b95a7;
+    --isg-text-faint: #64748b;
+    --isg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --isg-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --isg-focus: #60a5fa;
+
+    --isg-cta-bg: #f8fafc;
+    --isg-cta-fg: #0f172a;
+    --isg-cta-hover: #e2e8f0;
+
+    --isg-emerald: #10b981;
+    --isg-emerald-fg: #34d399;
+    --isg-emerald-tint: rgba(16, 185, 129, 0.14);
+    --isg-emerald-border: rgba(16, 185, 129, 0.32);
+
+    --isg-blue: #3b82f6;
+    --isg-blue-fg: #60a5fa;
+    --isg-blue-tint: rgba(59, 130, 246, 0.14);
+    --isg-blue-border: rgba(59, 130, 246, 0.32);
+
+    --isg-indigo: #818cf8;
+    --isg-indigo-fg: #a5b4fc;
+    --isg-indigo-tint: rgba(129, 140, 248, 0.14);
+
+    --isg-amber: #f59e0b;
+    --isg-amber-fg: #fbbf24;
+    --isg-amber-tint: rgba(245, 158, 11, 0.14);
+    --isg-amber-border: rgba(245, 158, 11, 0.32);
+
+    --isg-rose: #f43f5e;
+    --isg-rose-fg: #fb7185;
+    --isg-rose-tint: rgba(244, 63, 94, 0.15);
+    --isg-rose-border: rgba(244, 63, 94, 0.32);
+
+    --isg-slate-fg: #cbd5e1;
+    --isg-slate-tint: rgba(148, 163, 184, 0.15);
+}

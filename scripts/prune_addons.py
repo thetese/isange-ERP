@@ -41,10 +41,28 @@ ALWAYS_KEEP = {
     'base_setup',
     'bus',
     'mail',
+    'isange_property_fleet',
     'vercel_supabase',
 }
 
 PRESETS = {
+    'isange-erp': [
+        'base',
+        'web',
+        'contacts',
+        'sale_management',
+        'sale_pdf_quote_builder',
+        'purchase',
+        'stock',
+        'account',
+        'point_of_sale',
+        'fleet',
+        'maintenance',
+        'hr_expense',
+        'portal',
+        'isange_property_fleet',
+        'vercel_supabase',
+    ],
     'sales-invoicing': [
         'base',
         'web',
@@ -110,11 +128,11 @@ def main() -> int:
         '--preset',
         choices=sorted(PRESETS.keys()),
         default='',
-        help='Use a curated preset (e.g. `sales-invoicing` for Sales + Pro-Forma + Invoices: ~58 MB).',
+        help='Use a curated preset (e.g. `isange-erp` for full Isange Hardware ERP, or `sales-invoicing`).',
     )
     parser.add_argument(
         '--keep',
-        default='base,web,contacts,sale_management,account',
+        default='base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet',
         help='Comma-separated root addons to keep (dependencies are resolved automatically).',
     )
     parser.add_argument(
