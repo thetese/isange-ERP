@@ -24,7 +24,6 @@ _build/
 **/*.po
 **/tests/
 **/static/tests/
-**/demo/
 # compiled python files
 *.py[co]
 __pycache__/

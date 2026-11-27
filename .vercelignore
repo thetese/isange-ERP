@@ -22,7 +22,6 @@ debian
 setup
 **/tests
 **/static/tests
-**/demo
 # Exclude non-English .po translation files (~875 MB across 400+ addons!).
 # English (en_US) is built directly into source files and needs NO .po files.
 # This shrinks the ENTIRE 400+ addon Odoo 19 codebase to ~187 MB so it fits

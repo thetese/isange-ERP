@@ -4,7 +4,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 300,
-      "excludeFiles": "{doc/**,debian/**,setup/**,**/tests/**,**/static/tests/**,**/demo/**,**/*.po,scripts/**,supabase/**}"
+      "excludeFiles": "{doc/**,debian/**,setup/**,**/tests/**,**/static/tests/**,**/*.po,scripts/**,supabase/**}"
     }
   },
   "rewrites": [
