@@ -40,3 +40,38 @@ requirements.odoo.txt
 # Local helper scripts & SQL migrations
 scripts
 supabase
+
+# Exclude heavy non-sales/non-invoicing addons from the Vercel function bundle
+# to keep total uncompressed bundle size comfortably below Vercel's 225 MB cap
+# while keeping Sales, Pro-Forma Invoices, Invoicing, Contacts, CRM, Stock,
+# Purchase, Portal, and all country l10n_* localizations intact.
+addons/spreadsheet
+addons/spreadsheet_*
+addons/website_slides
+addons/website_slides_*
+addons/website_hr_recruitment
+addons/website_blog
+addons/website_event
+addons/website_event_*
+addons/website_forum
+addons/mass_mailing
+addons/mass_mailing_*
+addons/mrp
+addons/mrp_*
+addons/survey
+addons/survey_*
+addons/hr_recruitment
+addons/hr_recruitment_*
+addons/hr_timesheet
+addons/hr_attendance
+addons/project
+addons/project_*
+addons/fleet
+addons/pos_self_order
+addons/im_livechat
+addons/event
+addons/event_*
+addons/gamification
+addons/gamification_*
+addons/marketing_card
+addons/lunch
