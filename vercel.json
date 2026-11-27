@@ -4,7 +4,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 300,
-      "excludeFiles": "{doc/**,debian/**,setup/**,**/tests/**,**/static/tests/**,**/*.po,scripts/**,supabase/**,addons/spreadsheet/**,addons/spreadsheet_*/**,addons/website_slides/**,addons/website_slides_*/**,addons/website_hr_recruitment/**,addons/website_blog/**,addons/website_event/**,addons/website_event_*/**,addons/website_forum/**,addons/mass_mailing/**,addons/mass_mailing_*/**,addons/mrp/**,addons/mrp_*/**,addons/survey/**,addons/survey_*/**,addons/hr_recruitment/**,addons/hr_recruitment_*/**,addons/hr_timesheet/**,addons/hr_attendance/**,addons/project/**,addons/project_*/**,addons/fleet/**,addons/pos_self_order/**,addons/im_livechat/**,addons/event/**,addons/event_*/**,addons/gamification/**,addons/gamification_*/**,addons/marketing_card/**,addons/lunch/**}"
+      "excludeFiles": "{doc/**,debian/**,setup/**,**/tests/**,**/*.po,addons/spreadsheet*/**,addons/website_slides*/**,addons/website_blog/**,addons/website_event*/**,addons/website_hr*/**,addons/mass_mailing*/**,addons/mrp*/**,addons/survey*/**,addons/project*/**}"
     }
   },
   "rewrites": [
