@@ -54,6 +54,7 @@ PRESETS = {
         'html_editor',
         'http_routing',
         'base_setup',
+        'base_vat',
         'base_import',
         'base_import_module',
         'base_install_request',
