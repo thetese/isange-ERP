@@ -118,6 +118,7 @@ PRESETS = {
         'stock_sms',
         'point_of_sale',
         'pos_hr',
+        'pos_online_payment',
         'pos_sale',
         'resource',
         'resource_mail',
@@ -126,7 +127,9 @@ PRESETS = {
         'hr_fleet',
         'hr_homeworking',
         'hr_maintenance',
+        'hr_org_chart',
         'hr_skills',
+        'web_hierarchy',
         'fleet',
         'maintenance',
         # Custom Isange ERP & Vercel/Supabase adapter
