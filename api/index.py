@@ -415,7 +415,7 @@ def _handle_init_db(environ: dict, start_response):
             m.strip()
             for m in (
                 os.environ.get('ODOO_DEFAULT_MODULES')
-                or 'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,vercel_supabase'
+                or 'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,zxs_entp_theme,vercel_supabase'
             ).split(',')
             if m.strip()
         ]

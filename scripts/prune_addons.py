@@ -41,6 +41,7 @@ ALWAYS_KEEP = {
     'bus',
     'mail',
     'isange_property_fleet',
+    'zxs_entp_theme',
     'vercel_supabase',
 }
 
@@ -135,6 +136,7 @@ PRESETS = {
         'maintenance',
         # Custom Isange ERP & Vercel/Supabase adapter
         'isange_property_fleet',
+        'zxs_entp_theme',
         'vercel_supabase',
     ],
     'sales-invoicing': [
@@ -206,7 +208,7 @@ def main() -> int:
     )
     parser.add_argument(
         '--keep',
-        default='base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet',
+        default='base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,zxs_entp_theme',
         help='Comma-separated root addons to keep (dependencies are resolved automatically).',
     )
     parser.add_argument(

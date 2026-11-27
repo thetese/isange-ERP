@@ -51,7 +51,7 @@ def main() -> int:
         '--modules',
         default=os.environ.get(
             'ODOO_DEFAULT_MODULES',
-            'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,vercel_supabase',
+            'base,web,contacts,sale_management,purchase,stock,account,point_of_sale,fleet,maintenance,hr_expense,isange_property_fleet,zxs_entp_theme,vercel_supabase',
         ),
         help='Comma-separated list of modules to install (defaults to Isange Hardware ERP suite + vercel_supabase).',
     )
