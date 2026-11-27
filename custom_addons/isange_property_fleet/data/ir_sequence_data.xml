@@ -77,12 +77,26 @@
         <!-- 0. Activate RWF & USD Currencies, Rwanda TIN Label & Balanced A4 Paperformat -->
         <record id="base.RWF" model="res.currency">
             <field name="active" eval="True"/>
+            <field name="symbol">RWF</field>
+            <field name="position">after</field>
         </record>
         <record id="base.USD" model="res.currency">
             <field name="active" eval="True"/>
         </record>
         <record id="base.rw" model="res.country">
             <field name="vat_label">TIN</field>
+        </record>
+        <record id="uom_bag_50kg" model="uom.uom">
+            <field name="name">50Kg</field>
+            <field name="sequence">101</field>
+            <field name="relative_factor">1</field>
+            <field name="is_pos_groupable" eval="True"/>
+        </record>
+        <record id="uom_bag_30kg" model="uom.uom">
+            <field name="name">30Kg</field>
+            <field name="sequence">102</field>
+            <field name="relative_factor">1</field>
+            <field name="is_pos_groupable" eval="True"/>
         </record>
         <record id="base.paperformat_euro" model="report.paperformat">
             <field name="margin_top">40</field>
@@ -98,6 +112,7 @@
             <field name="street">Gisozi, Gasabo District</field>
             <field name="city">Kigali</field>
             <field name="country_id" ref="base.rw"/>
+            <field name="account_fiscal_country_id" ref="base.rw"/>
             <field name="currency_id" ref="base.RWF"/>
             <field name="vat">109047885</field>
             <field name="phone">+250 794 766 952</field>
@@ -236,6 +251,7 @@
         <record id="prod_cement_50kg" model="product.template">
             <field name="name">CEMENTS Nyarwanda (50Kg)</field>
             <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="uom_id" ref="uom_bag_50kg"/>
             <field name="type">consu</field>
             <field name="is_storable" eval="True"/>
             <field name="list_price">12500</field>
@@ -250,6 +266,7 @@
         <record id="prod_iron_sheet_28g" model="product.template">
             <field name="name">CEMENT TWIGA (50Kg)</field>
             <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="uom_id" ref="uom_bag_50kg"/>
             <field name="type">consu</field>
             <field name="is_storable" eval="True"/>
             <field name="list_price">13000</field>
@@ -264,6 +281,7 @@
         <record id="prod_cement_white" model="product.template">
             <field name="name">CEMENT WHITE (50Kg)</field>
             <field name="categ_id" ref="prod_cat_cement"/>
+            <field name="uom_id" ref="uom_bag_50kg"/>
             <field name="type">consu</field>
             <field name="is_storable" eval="True"/>
             <field name="list_price">18500</field>
@@ -306,6 +324,7 @@
         <record id="prod_pvc_pipe_110" model="product.template">
             <field name="name">COMPOUND 21 BY 9</field>
             <field name="categ_id" ref="prod_cat_paint"/>
+            <field name="uom_id" ref="uom_bag_30kg"/>
             <field name="type">consu</field>
             <field name="is_storable" eval="True"/>
             <field name="list_price">18000</field>
