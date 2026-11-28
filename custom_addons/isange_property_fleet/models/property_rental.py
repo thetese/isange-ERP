@@ -202,10 +202,10 @@ class IsangeProperty(models.Model):
             ),
             'partners': _safe_search_read(
                 'res.partner',
-                [('active', '=', True)],
-                ['id', 'name', 'phone', 'city'],
-                order='id desc',
-                limit=30,
+                [('active', '=', True), ('name', 'not ilike', '(Driver)')],
+                ['id', 'name', 'phone', 'city', 'supplier_rank', 'customer_rank'],
+                order='customer_rank asc, id desc',
+                limit=100,
             ),
             'journals': _safe_search_read(
                 'account.journal',

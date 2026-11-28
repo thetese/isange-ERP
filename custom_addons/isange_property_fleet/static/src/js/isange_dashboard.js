@@ -549,9 +549,9 @@ export class IsangeDashboard extends Component {
                 []
             ),
             this.safe(
-                this.orm.searchRead("res.partner", [["active", "=", true]], ["id", "name", "phone", "city"], {
-                    order: "id desc",
-                    limit: 30,
+                this.orm.searchRead("res.partner", [["active", "=", true], ["name", "not ilike", "(Driver)"]], ["id", "name", "phone", "city", "supplier_rank", "customer_rank"], {
+                    order: "customer_rank asc, id desc",
+                    limit: 100,
                 }),
                 []
             ),
@@ -1016,7 +1016,10 @@ export class IsangeDashboard extends Component {
             "Rentals & Fleet Manager",
             "Storekeeper (Inventory & Purchase)",
             "Eric Ndayisaba (Driver)",
+            "GLOBAL BUSINESS EXOR",
         ]);
+        const isDriverOrExcluded = (name) =>
+            excludedPartnerNames.has(name) || String(name || "").includes("(Driver)");
         let walkInPartner = rawPartners.find((pt) => (pt.name || "").toLowerCase().includes("walk-in") || (pt.name || "").toLowerCase().includes("cashier"));
         const customerList = [];
         if (walkInPartner) {
@@ -1032,7 +1035,7 @@ export class IsangeDashboard extends Component {
             if (walkInPartner && pt.id === walkInPartner.id) {
                 continue;
             }
-            if (excludedPartnerNames.has(pt.name)) {
+            if (isDriverOrExcluded(pt.name)) {
                 continue;
             }
             customerList.push({
@@ -1140,14 +1143,14 @@ export class IsangeDashboard extends Component {
             sm.locationId = whStock.id;
         }
         const supplierList = rawPartners
-            .filter((pt) => !["Administrator", "Isange Hardware", "Isange Hardware Ltd", "Rentals & Fleet Manager", "Storekeeper (Inventory & Purchase)", "Eric Ndayisaba (Driver)"].includes(pt.name))
+            .filter((pt) => !isDriverOrExcluded(pt.name) && !(pt.name || "").toLowerCase().includes("walk-in"))
             .map((pt) => ({
                 id: pt.id,
                 name: pt.name,
                 shortName: (pt.name || "").replace(/\s*\(.*?\)/g, "").trim(),
             }));
-        // Put East Africa Building Supplies first as default supplier
-        supplierList.sort((a, b) => b.name.toLowerCase().includes("supplier") - a.name.toLowerCase().includes("supplier"));
+        // Put suppliers / East Africa Building Supplies first as default supplier
+        supplierList.sort((a, b) => b.name.toLowerCase().includes("supplier") - a.name.toLowerCase().includes("supplier") || b.name.toLowerCase().includes("supplies") - a.name.toLowerCase().includes("supplies"));
         sm.suppliers = supplierList;
         if (!sm.supplierId && supplierList.length) {
             sm.supplierId = supplierList[0].id;
