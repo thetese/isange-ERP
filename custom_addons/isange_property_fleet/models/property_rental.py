@@ -107,12 +107,13 @@ class IsangeProperty(models.Model):
             if model_name not in self.env:
                 return []
             try:
-                kwargs = {}
-                if order:
-                    kwargs['order'] = order
-                if limit:
-                    kwargs['limit'] = limit
-                return self.env[model_name].search_read(domain, fields_list, **kwargs)
+                with self.env.cr.savepoint():
+                    kwargs = {}
+                    if order:
+                        kwargs['order'] = order
+                    if limit:
+                        kwargs['limit'] = limit
+                    return self.env[model_name].search_read(domain, fields_list, **kwargs)
             except Exception:
                 return []
 
