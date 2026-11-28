@@ -374,6 +374,20 @@ export class IsangeDashboard extends Component {
         try {
             const bundled = await this.orm.call("isange.property", "get_command_center_data", [sixStartUtc]);
             if (bundled && bundled.currencyInfo) {
+                if (!Array.isArray(bundled.products) || !bundled.products.length) {
+                    const retryProds = await this.safe(
+                        this.orm.searchRead(
+                            "product.product",
+                            [["sale_ok", "=", true], ["type", "!=", "service"]],
+                            ["id", "name", "default_code", "list_price", "standard_price", "qty_available", "free_qty", "incoming_qty", "outgoing_qty", "is_storable", "uom_id", "construction_category", "taxes_id", "write_date"],
+                            { order: "name asc", limit: 80 }
+                        ),
+                        []
+                    );
+                    if (retryProds.length) {
+                        bundled.products = retryProds;
+                    }
+                }
                 return bundled;
             }
         } catch (err) {

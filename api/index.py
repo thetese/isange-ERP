@@ -160,7 +160,9 @@ def bootstrap_odoo() -> None:
         if 'vercel_supabase' not in [m.strip() for m in server_wide.split(',')]:
             server_wide = f"{server_wide},vercel_supabase"
 
-        db_maxconn = os.environ.get('ODOO_DB_MAXCONN') or '12'
+        # Keep pool size modest so multiple Fluid Compute workers never exceed
+        # Supabase Session Pooler's max client limit (MaxClientsInSessionMode).
+        db_maxconn = os.environ.get('ODOO_DB_MAXCONN') or '5'
         log_level = os.environ.get('ODOO_LOG_LEVEL') or 'info'
 
         # IMPORTANT: On Supabase the database is literally named `postgres`.
