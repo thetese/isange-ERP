@@ -80,6 +80,11 @@ const BUILDING_UNIT_DOMAIN = [["property_type", "!=", "house"]];
 
 const UNASSIGNED_FLOOR = "Unassigned Floor";
 
+// Client-side stale-while-revalidate cache so revisiting Command Center,
+// Quick Sale, Stock Manager, or Vehicle Manager renders in 0ms while
+// fresh data refreshes silently in the background.
+let _ISANGE_RAW_CACHE = null;
+
 function m2oName(value) {
     return Array.isArray(value) ? value[1] : "";
 }
@@ -310,11 +315,19 @@ export class IsangeDashboard extends Component {
                 editOdo: "",
             },
         });
-        onWillStart(() => this.loadData());
+        onWillStart(async () => {
+            if (_ISANGE_RAW_CACHE) {
+                this._hydrateFromRaw(_ISANGE_RAW_CACHE);
+                // Refresh fresh numbers silently without blocking render
+                this.loadData({ background: true });
+                return;
+            }
+            await this.loadData();
+        });
     }
 
     // ------------------------------------------------------------------
-    // Data loading
+    // Data loading (Single-RPC Bootstrap + 0ms SWR Client Cache)
     // ------------------------------------------------------------------
 
     async safe(promise, fallback) {
@@ -337,7 +350,7 @@ export class IsangeDashboard extends Component {
         }
         const [companies, currencies] = await Promise.all([
             this.safe(this.orm.searchRead("res.company", [], ["currency_id"], { limit: 1 }), []),
-            this.safe(this.orm.searchRead("res.currency", [], ["name", "symbol", "rate"]), []),
+            this.safe(this.orm.searchRead("res.currency", [["active", "=", true]], ["name", "symbol", "rate"]), []),
         ]);
         const compCurrId = companies.length ? m2oId(companies[0].currency_id) : false;
         const compCurrName = companies.length ? m2oName(companies[0].currency_id) : "RWF";
@@ -356,17 +369,16 @@ export class IsangeDashboard extends Component {
         };
     }
 
-    async loadData() {
-        const now = DateTime.local();
-        const todayStr = now.toISODate();
-        const monthKeyNow = now.toFormat("yyyy-MM");
-        const sixStart = now.startOf("month").minus({ months: 5 });
-        const sixStartUtc = serializeDateTime(sixStart);
-        const in30Str = now.plus({ days: 30 }).toISODate();
-
-        const hour = now.hour;
-        this.state.greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-        this.state.today = now.setLocale("en-GB").toFormat("cccc d LLLL yyyy");
+    async _fetchRawData(sixStartUtc) {
+        // Fast path: 1 single server-side RPC instead of 17 parallel round-trips
+        try {
+            const bundled = await this.orm.call("isange.property", "get_command_center_data", [sixStartUtc]);
+            if (bundled && bundled.currencyInfo) {
+                return bundled;
+            }
+        } catch (err) {
+            console.warn("Isange Command Center: falling back to multi-RPC load", err);
+        }
 
         const [
             currencyInfo,
@@ -380,11 +392,11 @@ export class IsangeDashboard extends Component {
             vehicles,
             fleetServices,
             fleetServiceTypes,
-            rawProducts,
-            rawPartners,
-            rawJournals,
-            rawTaxes,
-            rawLocations,
+            products,
+            partners,
+            journals,
+            taxes,
+            locations,
         ] = await Promise.all([
             this.loadCurrencyInfo(),
             this.safe(
@@ -554,6 +566,69 @@ export class IsangeDashboard extends Component {
                 []
             ),
         ]);
+        return {
+            currencyInfo,
+            units,
+            leases,
+            rentInvoices,
+            sales,
+            posOrders,
+            purchases,
+            trips,
+            vehicles,
+            fleetServices,
+            fleetServiceTypes,
+            products,
+            partners,
+            journals,
+            taxes,
+            locations,
+        };
+    }
+
+    async loadData({ background = false } = {}) {
+        const now = DateTime.local();
+        const sixStart = now.startOf("month").minus({ months: 5 });
+        const sixStartUtc = serializeDateTime(sixStart);
+        try {
+            const raw = await this._fetchRawData(sixStartUtc);
+            _ISANGE_RAW_CACHE = raw;
+            this._hydrateFromRaw(raw);
+        } catch (err) {
+            if (!background) {
+                console.warn("Isange Command Center load error", err);
+                this.state.loading = false;
+            }
+        }
+    }
+
+    _hydrateFromRaw(raw) {
+        const now = DateTime.local();
+        const todayStr = now.toISODate();
+        const monthKeyNow = now.toFormat("yyyy-MM");
+        const sixStart = now.startOf("month").minus({ months: 5 });
+        const in30Str = now.plus({ days: 30 }).toISODate();
+
+        const hour = now.hour;
+        this.state.greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+        this.state.today = now.setLocale("en-GB").toFormat("cccc d LLLL yyyy");
+
+        const currencyInfo = raw.currencyInfo || { name: "RWF", symbol: "RWF", rates: {} };
+        const units = raw.units || [];
+        const leases = raw.leases || [];
+        const rentInvoices = raw.rentInvoices || [];
+        const sales = raw.sales || [];
+        const posOrders = raw.posOrders || [];
+        const purchases = raw.purchases || [];
+        const trips = raw.trips || [];
+        const vehicles = raw.vehicles || [];
+        const fleetServices = raw.fleetServices || [];
+        const fleetServiceTypes = raw.fleetServiceTypes || [];
+        const rawProducts = raw.products || [];
+        const rawPartners = raw.partners || [];
+        const rawJournals = raw.journals || [];
+        const rawTaxes = raw.taxes || [];
+        const rawLocations = raw.locations || [];
 
         // ---------------- Currency conversion (to company currency) ----------------
         const rates = currencyInfo.rates || {};
@@ -1920,39 +1995,63 @@ export class IsangeDashboard extends Component {
         const after = this.adjustAfter;
         sm.busy = true;
         try {
-            if (sm.mode === "add" && sm.reason === "delivery" && sm.usePO && sm.supplierId) {
-                const poCreated = await this.orm.create("purchase.order", [
+            let usedFastRpc = false;
+            try {
+                await this.orm.call("isange.property", "execute_stock_adjustment", [
                     {
-                        partner_id: Number(sm.supplierId),
-                        order_line: [
-                            [
-                                0,
-                                0,
-                                {
-                                    product_id: prod.id,
-                                    name: prod.name,
-                                    product_qty: delta,
-                                    price_unit: Number(prod.editCost) || Number(prod.cost) || 0,
-                                },
-                            ],
-                        ],
+                        product_id: prod.id,
+                        location_id: sm.locationId || 5,
+                        target_qty: after,
+                        delta,
+                        label,
+                        use_po: sm.mode === "add" && sm.reason === "delivery" && sm.usePO && Boolean(sm.supplierId),
+                        supplier_id: sm.supplierId || 0,
+                        unit_cost: Number(prod.editCost) || Number(prod.cost) || 0,
                     },
                 ]);
-                const poId = Array.isArray(poCreated) ? poCreated[0] : poCreated;
-                await this.orm.call("purchase.order", "button_confirm", [[poId]]);
-                const [poInfo] = await this.orm.read("purchase.order", [poId], ["name", "picking_ids"]);
-                if (poInfo && poInfo.picking_ids && poInfo.picking_ids.length) {
-                    await this.validateOrderPickings(poInfo.picking_ids);
+                usedFastRpc = true;
+            } catch (fastErr) {
+                if (String(fastErr && fastErr.message || "").includes("execute_stock_adjustment")) {
+                    usedFastRpc = false;
+                } else {
+                    throw fastErr;
+                }
+            }
+
+            if (!usedFastRpc) {
+                if (sm.mode === "add" && sm.reason === "delivery" && sm.usePO && sm.supplierId) {
+                    const poCreated = await this.orm.create("purchase.order", [
+                        {
+                            partner_id: Number(sm.supplierId),
+                            order_line: [
+                                [
+                                    0,
+                                    0,
+                                    {
+                                        product_id: prod.id,
+                                        name: prod.name,
+                                        product_qty: delta,
+                                        price_unit: Number(prod.editCost) || Number(prod.cost) || 0,
+                                    },
+                                ],
+                            ],
+                        },
+                    ]);
+                    const poId = Array.isArray(poCreated) ? poCreated[0] : poCreated;
+                    await this.orm.call("purchase.order", "button_confirm", [[poId]]);
+                    const [poInfo] = await this.orm.read("purchase.order", [poId], ["name", "picking_ids"]);
+                    if (poInfo && poInfo.picking_ids && poInfo.picking_ids.length) {
+                        await this.validateOrderPickings(poInfo.picking_ids);
+                    } else {
+                        await this.applyProductStock(prod.id, after, label);
+                    }
                 } else {
                     await this.applyProductStock(prod.id, after, label);
                 }
-            } else {
-                await this.applyProductStock(prod.id, after, label);
             }
             sm.qty = "";
             sm.note = "";
-            await this.loadData();
-            await this.loadStockHistory(prod.id);
+            await Promise.all([this.loadData(), this.loadStockHistory(prod.id)]);
             const sign = delta > 0 ? "+" : "";
             this.notification.add(
                 `${prod.name}: ${this.fmt(before)} → ${this.fmt(after)} ${prod.uom} (${sign}${this.fmt(delta)}) · ${reasonDef.label}`,
@@ -2303,14 +2402,90 @@ export class IsangeDashboard extends Component {
         fs.busy = true;
         try {
             let partnerId = Number(fs.partnerId);
+            if (!partnerId && fs.customers.length) {
+                partnerId = fs.customers[0].id;
+            }
+            const taxIds = fs.applyVat && fs.vatTaxId ? [fs.vatTaxId] : [];
+            const totalSnapshot = this.fastCartTotal;
+            const shouldPrint = fs.autoPrint;
+
+            // Fast path: execute entire sale (Order + Stock + Invoice + Payment + Trip) in 1 RPC
+            let fastRes = null;
+            try {
+                fastRes = await this.orm.call("isange.property", "execute_fast_sale", [
+                    {
+                        mode,
+                        partner_id: partnerId,
+                        new_customer_name: fs.showNewCustomer ? (fs.newCustomerName || "").trim() : "",
+                        new_customer_phone: fs.showNewCustomer ? (fs.newCustomerPhone || "").trim() : "",
+                        cart: fs.cart.map((item) => ({
+                            id: item.id,
+                            name: item.name,
+                            qty: Number(item.qty) || 1,
+                            price: Number(item.price) || 0,
+                            original_price: Number(item.originalPrice) || 0,
+                        })),
+                        tax_ids: taxIds,
+                        invoice_date: DateTime.local().toISODate(),
+                        journals: fs.journals,
+                        split: fs.split,
+                        total_amount: totalSnapshot,
+                        add_delivery: Boolean(fs.addDelivery && fs.vehicleId),
+                        vehicle_id: fs.vehicleId || 0,
+                        destination: (fs.destination || "").trim(),
+                        delivery_fee: Number(fs.deliveryFee) || 0,
+                    },
+                ]);
+            } catch (fastErr) {
+                if (String(fastErr && fastErr.message || "").includes("execute_fast_sale")) {
+                    fastRes = null;
+                } else {
+                    throw fastErr;
+                }
+            }
+
+            if (fastRes && fastRes.so_id) {
+                if (fs.showNewCustomer && (fs.newCustomerName || "").trim()) {
+                    fs.newCustomerName = "";
+                    fs.newCustomerPhone = "";
+                    fs.showNewCustomer = false;
+                    fs.partnerId = fastRes.partner_id;
+                }
+                fs.lastSale = {
+                    soId: fastRes.so_id,
+                    soName: fastRes.so_name,
+                    invId: fastRes.inv_id || false,
+                    invName: fastRes.inv_name || "",
+                    customer: fastRes.customer || "Customer",
+                    amount: totalSnapshot,
+                    badge: fastRes.badge,
+                };
+                this.clearCart();
+                // Non-blocking background refresh so cashier can ring up the next customer immediately!
+                this.loadData({ background: true });
+                if (mode === "quotation") {
+                    this.notification.add(`Quotation ${fastRes.so_name} saved! Opening Pro-Forma PDF...`, {
+                        title: "Quotation Ready",
+                        type: "success",
+                    });
+                    this.printProForma(fastRes.so_id);
+                } else {
+                    this.notification.add(
+                        `${fastRes.so_name} (${fastRes.inv_name}) — ${this.fmt(totalSnapshot)} ${this.state.currency} [${fastRes.badge}]`,
+                        { title: "Sale Completed!", type: "success" }
+                    );
+                    if (shouldPrint && fastRes.inv_id) {
+                        this.printInvoicePdf(fastRes.inv_id);
+                    }
+                }
+                return;
+            }
+
             if (fs.showNewCustomer && (fs.newCustomerName || "").trim()) {
                 const createdId = await this.createQuickCustomer();
                 if (createdId) {
                     partnerId = createdId;
                 }
-            }
-            if (!partnerId && fs.customers.length) {
-                partnerId = fs.customers[0].id;
             }
 
             // Remember any prices typed for items that previously had 0 list_price
@@ -2324,7 +2499,6 @@ export class IsangeDashboard extends Component {
                 }
             }
 
-            const taxIds = fs.applyVat && fs.vatTaxId ? [fs.vatTaxId] : [];
             const orderLines = fs.cart.map((item) => [
                 0,
                 0,
@@ -2483,9 +2657,6 @@ export class IsangeDashboard extends Component {
                     null
                 );
             }
-
-            const totalSnapshot = this.fastCartTotal;
-            const shouldPrint = fs.autoPrint;
 
             fs.lastSale = {
                 soId,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import base64
 import contextlib
+import copy
 import functools
 import json
 import logging
@@ -21,6 +22,15 @@ _logger = logging.getLogger(__name__)
 SESSION_LIFETIME = 60 * 60 * 24 * 7  # 7 days
 SESSION_DELETION_TIMER = 120
 STORED_SESSION_BYTES = 42
+
+# Short warm-worker TTL cache to avoid hitting Supabase PostgreSQL on every
+# concurrent RPC/image request under Vercel Fluid Compute.
+_SESSION_CACHE_TTL = float(os.environ.get('ODOO_SESSION_CACHE_TTL') or '12')
+_SESSION_WRITE_SKIP_TTL = float(os.environ.get('ODOO_SESSION_WRITE_SKIP_TTL') or '60')
+_SESSION_CACHE_MAX = 256
+# sid -> (cached_at, saved_at, payload_json, data_dict)
+_SESSION_CACHE: dict[str, tuple[float, float, str, dict]] = {}
+_SESSION_CACHE_LOCK = threading.Lock()
 
 _base64_urlsafe_re = re.compile(r'^[A-Za-z0-9_-]{84}$')
 _session_identifier_re = re.compile(r'^[A-Za-z0-9_-]{%s}$' % STORED_SESSION_BYTES)
@@ -118,10 +128,42 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
     def is_valid_key(self, key):
         return bool(key) and _base64_urlsafe_re.match(key) is not None
 
+    def _cache_put(self, sid: str, payload: str, data: dict, saved_at: float | None = None) -> None:
+        now = time.monotonic()
+        with _SESSION_CACHE_LOCK:
+            if len(_SESSION_CACHE) >= _SESSION_CACHE_MAX and sid not in _SESSION_CACHE:
+                # Evict oldest entry
+                oldest = min(_SESSION_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _SESSION_CACHE.pop(oldest, None)
+            _SESSION_CACHE[sid] = (now, saved_at if saved_at is not None else now, payload, copy.deepcopy(data))
+
+    def _cache_evict(self, sid: str) -> None:
+        with _SESSION_CACHE_LOCK:
+            _SESSION_CACHE.pop(sid, None)
+
+    def _cache_evict_identifiers(self, identifiers: list[str]) -> None:
+        id_set = set(identifiers)
+        with _SESSION_CACHE_LOCK:
+            for k in [sid for sid in _SESSION_CACHE if sid[:STORED_SESSION_BYTES] in id_set]:
+                _SESSION_CACHE.pop(k, None)
+
     def save(self, session):
         if not self.is_valid_key(session.sid):
             raise ValueError(f'Invalid session id {session.sid!r}')
-        payload = json.dumps(dict(session))
+        data_dict = dict(session)
+        payload = json.dumps(data_dict, sort_keys=True)
+        now_mono = time.monotonic()
+        with _SESSION_CACHE_LOCK:
+            cached = _SESSION_CACHE.get(session.sid)
+            if (
+                cached is not None
+                and cached[2] == payload
+                and (now_mono - cached[1]) < _SESSION_WRITE_SKIP_TTL
+            ):
+                # Identical session payload recently persisted — skip redundant DB write
+                _SESSION_CACHE[session.sid] = (now_mono, cached[1], payload, copy.deepcopy(data_dict))
+                return
+
         identifier = session.sid[:STORED_SESSION_BYTES]
         now = time.time()
         with self._cursor() as cr:
@@ -136,10 +178,12 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
                 """,
                 (session.sid, identifier, payload, now),
             )
+        self._cache_put(session.sid, payload, data_dict, saved_at=now_mono)
 
     def delete(self, session):
         if not session or not session.sid:
             return
+        self._cache_evict(session.sid)
         try:
             with self._cursor() as cr:
                 cr.execute(
@@ -152,6 +196,13 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
     def get(self, sid):
         if not self.is_valid_key(sid):
             return self.new()
+
+        now_mono = time.monotonic()
+        with _SESSION_CACHE_LOCK:
+            cached = _SESSION_CACHE.get(sid)
+            if cached is not None and (now_mono - cached[0]) < _SESSION_CACHE_TTL:
+                return self.session_class(copy.deepcopy(cached[3]), sid, False)
+
         try:
             with self._cursor() as cr:
                 cr.execute(
@@ -179,6 +230,8 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
             data = raw
         else:
             data = {}
+        payload = json.dumps(data, sort_keys=True)
+        self._cache_put(sid, payload, data, saved_at=now_mono)
         return self.session_class(data, sid, False)
 
     def delete_old_sessions(self, session):
@@ -252,6 +305,7 @@ class SupabasePostgresSessionStore(sessions.SessionStore):
             valid.append(identifier)
         if not valid:
             return
+        self._cache_evict_identifiers(valid)
         try:
             with self._cursor() as cr:
                 cr.execute(

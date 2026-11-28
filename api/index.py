@@ -11,10 +11,13 @@ Exposes standard WSGI callables ``app`` and ``application`` backed by Odoo 19's
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import logging
+import mimetypes
 import os
+import re
 import sys
 import threading
 import time
@@ -157,7 +160,7 @@ def bootstrap_odoo() -> None:
         if 'vercel_supabase' not in [m.strip() for m in server_wide.split(',')]:
             server_wide = f"{server_wide},vercel_supabase"
 
-        db_maxconn = os.environ.get('ODOO_DB_MAXCONN') or '4'
+        db_maxconn = os.environ.get('ODOO_DB_MAXCONN') or '12'
         log_level = os.environ.get('ODOO_LOG_LEVEL') or 'info'
 
         # IMPORTANT: On Supabase the database is literally named `postgres`.
@@ -536,11 +539,145 @@ def _handle_init_db(environ: dict, start_response):
 
 
 # =============================================================================
-# 4. Main Vercel WSGI Application
+# 4. Zero-DB Static File Fast Path & Vercel Edge CDN Header Middleware
+# =============================================================================
+_STATIC_PATH_RE = re.compile(r'^/([A-Za-z0-9_]+)/static/(.+)$')
+_STATIC_ROOTS = (
+    PROJECT_ROOT / 'custom_addons',
+    PROJECT_ROOT / 'addons',
+    PROJECT_ROOT / 'odoo' / 'addons',
+)
+_STATIC_CACHE: dict[str, tuple[bytes, str, str] | None] = {}
+_STATIC_CACHE_MAX = 512
+
+mimetypes.add_type('font/woff2', '.woff2')
+mimetypes.add_type('font/woff', '.woff')
+mimetypes.add_type('image/svg+xml', '.svg')
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
+
+
+def _serve_addon_static(environ: dict, start_response, path: str):
+    """Serve /<addon>/static/... directly from disk with zero Odoo/DB overhead."""
+    method = environ.get('REQUEST_METHOD', 'GET').upper()
+    if method not in ('GET', 'HEAD'):
+        return None
+
+    m = _STATIC_PATH_RE.match(path)
+    if not m:
+        return None
+    addon_name, rel_part = m.group(1), unquote(m.group(2))
+    if '..' in rel_part or '\x00' in rel_part:
+        return None
+
+    cache_key = f"{addon_name}/{rel_part}"
+    cached = _STATIC_CACHE.get(cache_key)
+    if cache_key not in _STATIC_CACHE:
+        found = None
+        for root in _STATIC_ROOTS:
+            static_base = (root / addon_name / 'static').resolve()
+            if not static_base.is_dir():
+                continue
+            target = (static_base / rel_part).resolve()
+            try:
+                target.relative_to(static_base)
+            except ValueError:
+                continue
+            if target.is_file():
+                # Only cache files up to 512 KB in RAM; stream larger ones directly
+                size = target.stat().st_size
+                mime, _ = mimetypes.guess_type(str(target))
+                content_type = mime or 'application/octet-stream'
+                data = target.read_bytes()
+                etag = f'"{hashlib.sha1(data).hexdigest()}"'
+                found = (data, content_type, etag)
+                if size <= 524288 and len(_STATIC_CACHE) < _STATIC_CACHE_MAX:
+                    _STATIC_CACHE[cache_key] = found
+                break
+        if found is None and len(_STATIC_CACHE) < _STATIC_CACHE_MAX:
+            _STATIC_CACHE[cache_key] = None
+        cached = found
+
+    if cached is None:
+        return None
+
+    data, content_type, etag = cached
+    inm = (environ.get('HTTP_IF_NONE_MATCH') or '').strip()
+    base_headers = [
+        ('Content-Type', content_type),
+        ('ETag', etag),
+        ('Cache-Control', 'public, max-age=31536000, immutable'),
+        ('CDN-Cache-Control', 'public, max-age=31536000, immutable'),
+        ('X-Isange-Fast-Static', '1'),
+    ]
+    if inm == etag:
+        start_response('304 Not Modified', base_headers)
+        return [b'']
+
+    base_headers.append(('Content-Length', str(len(data))))
+    start_response('200 OK', base_headers)
+    return [b''] if method == 'HEAD' else [data]
+
+
+def _classify_cdn_cache(path: str, query_string: str) -> str:
+    """Return caching tier for Odoo-served responses:
+      - 'public_immutable' : /web/assets/... (hashed bundles; strip Set-Cookie for Edge HIT!)
+      - 'public_logo'      : /web/binary/company_logo, /favicon.ico (strip Set-Cookie!)
+      - 'private_immutable': /web/image/...?unique=... (browser disk cache, never shared CDN)
+      - ''                 : dynamic/HTML/RPC (leave untouched)
+    """
+    if path.startswith('/web/assets/'):
+        return 'public_immutable'
+    if path in ('/web/binary/company_logo', '/favicon.ico', '/web/static/img/favicon.ico'):
+        return 'public_logo'
+    if path.startswith('/web/image/') and 'unique=' in (query_string or ''):
+        return 'private_immutable'
+    return ''
+
+
+def _wrap_cdn_start_response(start_response, cache_tier: str):
+    if not cache_tier:
+        return start_response
+
+    def wrapped(status, headers, exc_info=None):
+        code = int(str(status).split(' ', 1)[0]) if status else 500
+        if code in (200, 304):
+            new_headers = []
+            for k, v in headers:
+                kl = k.lower()
+                # Removing Set-Cookie on public static/asset responses unlocks Vercel Edge CDN HITs
+                if cache_tier in ('public_immutable', 'public_logo') and kl == 'set-cookie':
+                    continue
+                if kl in ('cache-control', 'cdn-cache-control', 'pragma', 'expires'):
+                    continue
+                new_headers.append((k, v))
+
+            if cache_tier == 'public_immutable':
+                new_headers.append(('Cache-Control', 'public, max-age=31536000, immutable'))
+                new_headers.append(('CDN-Cache-Control', 'public, max-age=31536000, immutable'))
+            elif cache_tier == 'public_logo':
+                new_headers.append(('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400'))
+                new_headers.append(('CDN-Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800'))
+            elif cache_tier == 'private_immutable':
+                new_headers.append(('Cache-Control', 'private, max-age=31536000, immutable'))
+            return start_response(status, new_headers, exc_info)
+        return start_response(status, headers, exc_info)
+
+    return wrapped
+
+
+# =============================================================================
+# 5. Main Vercel WSGI Application
 # =============================================================================
 def application(environ: dict, start_response):
     """WSGI entrypoint invoked by Vercel Python Fluid Compute."""
     path = environ.get('PATH_INFO', '') or '/'
+
+    # Fast zero-DB static file serving for /<addon>/static/... (icons, fonts, JS/CSS)
+    if '/static/' in path:
+        static_resp = _serve_addon_static(environ, start_response, path)
+        if static_resp is not None:
+            return static_resp
 
     # Handle Vercel + Supabase platform endpoints before entering Odoo routing
     if path in ('/api/health', '/_vercel_odoo/health'):
@@ -569,8 +706,11 @@ def application(environ: dict, start_response):
 
     bootstrap_odoo()
 
+    cache_tier = _classify_cdn_cache(path, environ.get('QUERY_STRING', ''))
+    wrapped_sr = _wrap_cdn_start_response(start_response, cache_tier)
+
     import odoo.http as odoo_http  # noqa: PLC0415
-    return odoo_http.root(environ, start_response)
+    return odoo_http.root(environ, wrapped_sr)
 
 
 # Vercel detects either `app` or `application` as the WSGI callable
