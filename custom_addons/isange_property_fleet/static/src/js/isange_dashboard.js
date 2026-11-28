@@ -323,6 +323,10 @@ export class IsangeDashboard extends Component {
                 payDate: "",
                 payNote: "",
                 confirmBatchBill: false,
+                showEditLease: false,
+                editRentAmount: "",
+                editNextDueDate: "",
+                confirmEndLease: false,
                 lastReceipt: null,
             },
             // ---------------- Daily Sales & Cash-Up Report State ----------------
@@ -1857,6 +1861,78 @@ export class IsangeDashboard extends Component {
         rm.payAmount = inv.residual > 0 ? String(Math.round(inv.residual)) : "";
         rm.payDate = rm.payDate || DateTime.local().toISODate();
         rm.payNote = "";
+        rm.showEditLease = false;
+        rm.confirmEndLease = false;
+    }
+
+    toggleEditLease() {
+        const rm = this.state.rentMgr;
+        const sel = this.selectedRentInvoice;
+        rm.showEditLease = !rm.showEditLease;
+        rm.confirmEndLease = false;
+        if (rm.showEditLease && sel && sel.leaseId) {
+            const lease = (rm.leases || []).find((l) => l.id === sel.leaseId);
+            rm.editRentAmount = String(Math.round((lease && lease.rent_amount) || sel.total || 0));
+            rm.editNextDueDate = (lease && lease.next_invoice_date) || sel.nextBillingDate || "";
+        }
+    }
+
+    async saveLeaseEdit() {
+        const rm = this.state.rentMgr;
+        const sel = this.selectedRentInvoice;
+        if (!sel || !sel.leaseId || rm.busy) {
+            return;
+        }
+        const amt = parseFloat(rm.editRentAmount);
+        if (isNaN(amt) || amt <= 0) {
+            this.notification.add("Enter a valid monthly rent amount greater than 0.", { type: "warning" });
+            return;
+        }
+        rm.busy = true;
+        try {
+            await this.orm.call("isange.property", "execute_update_lease_rent", [
+                {
+                    lease_id: sel.leaseId,
+                    rent_amount: amt,
+                    next_invoice_date: rm.editNextDueDate || false,
+                },
+            ]);
+            rm.showEditLease = false;
+            await this.loadData();
+            this.notification.add(
+                `${sel.tenant} monthly rent updated to ${this.fmt(amt)} ${this.state.currency}${rm.editNextDueDate ? ` (Next due ${rm.editNextDueDate})` : ""}.`,
+                { title: "Lease Updated", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not update lease terms.", { type: "danger" });
+        } finally {
+            rm.busy = false;
+        }
+    }
+
+    async endSelectedLease() {
+        const rm = this.state.rentMgr;
+        const sel = this.selectedRentInvoice;
+        if (!sel || !sel.leaseId || rm.busy) {
+            return;
+        }
+        rm.busy = true;
+        try {
+            await this.orm.call("isange.property", "execute_end_lease", [sel.leaseId]);
+            rm.showEditLease = false;
+            rm.confirmEndLease = false;
+            await this.loadData();
+            this.notification.add(`${sel.unit} marked Vacant and lease ended.`, {
+                title: "Lease Ended",
+                type: "success",
+            });
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not end lease.", { type: "danger" });
+        } finally {
+            rm.busy = false;
+        }
     }
 
     setRentFilter(filter) {

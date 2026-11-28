@@ -657,6 +657,41 @@ class IsangeProperty(models.Model):
         }
 
     @api.model
+    def execute_update_lease_rent(self, payload):
+        """Update a tenant's monthly rent amount and/or next due date right from Command Center."""
+        lease_id = int(payload.get('lease_id') or 0)
+        lease = self.env['isange.lease'].browse(lease_id)
+        if not lease.exists():
+            raise UserError(_('Lease not found.'))
+        vals = {}
+        if payload.get('rent_amount') not in (None, ''):
+            amt = float(payload['rent_amount'])
+            if amt <= 0:
+                raise UserError(_('Monthly rent must be greater than 0.'))
+            vals['rent_amount'] = amt
+        if payload.get('next_invoice_date'):
+            vals['next_invoice_date'] = fields.Date.to_date(payload['next_invoice_date'])
+        if vals:
+            lease.write(vals)
+            if 'rent_amount' in vals and lease.property_id:
+                lease.property_id.write({'monthly_rent': vals['rent_amount']})
+        return {
+            'ok': True,
+            'lease_id': lease.id,
+            'rent_amount': float(lease.rent_amount or 0.0),
+            'next_invoice_date': str(lease.next_invoice_date or ''),
+        }
+
+    @api.model
+    def execute_end_lease(self, lease_id):
+        """Terminate an active lease and mark the rental unit Vacant in 1 click."""
+        lease = self.env['isange.lease'].browse(int(lease_id or 0))
+        if not lease.exists():
+            raise UserError(_('Lease not found.'))
+        lease.action_terminate()
+        return {'ok': True, 'lease_id': lease.id, 'property_name': lease.property_id.name}
+
+    @api.model
     def execute_log_vehicle_fuel(self, payload):
         """Log a vehicle fuel refill (liters, price/L, total cost, odometer, station)
         in ONE atomic RPC into fleet.vehicle.log.services under 'Fuel Refill'."""

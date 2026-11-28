@@ -52,11 +52,10 @@ def install_custom_asset_versioning() -> None:
     orig_fget = orig_prop.fget
 
     def _patched_last_modified(self):
-        if self._last_modified is None and self._filename and not getattr(self.bundle, 'is_debug_assets', False):
+        if self._filename and not getattr(self.bundle, 'is_debug_assets', False):
             token = _custom_file_token(self._filename)
             if token is not None:
-                self._last_modified = token
-                return self._last_modified
+                return token
         return orig_fget(self)
 
     assetsbundle.WebAsset.last_modified = property(_patched_last_modified)

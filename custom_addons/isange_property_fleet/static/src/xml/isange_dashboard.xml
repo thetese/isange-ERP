@@ -1661,10 +1661,10 @@
                                             </div>
                                         </t>
 
-                                        <!-- Next Month Lease Billing Bar -->
+                                        <!-- Next Month Lease Billing & Controls Bar -->
                                         <div t-if="sel.leaseId" class="o_isg_fl_odo_bar">
                                             <div>
-                                                <div class="o_isg_person_name">Active Lease Billing</div>
+                                                <div class="o_isg_person_name">Active Lease Controls</div>
                                                 <div class="o_isg_muted small">
                                                     Next rent due: <strong class="o_isg_num"><t t-out="sel.nextBillingDate or 'Ready'"/></strong>
                                                 </div>
@@ -1675,9 +1675,60 @@
                                                     t-on-click="() => this.billNextMonthRent(sel.leaseId)">
                                                     <i class="fa fa-calendar-plus-o me-1"/>Bill Next Month
                                                 </button>
+                                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                    t-on-click="() => this.toggleEditLease()">
+                                                    <i class="fa fa-pencil me-1"/>Edit Rent
+                                                </button>
                                                 <button type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('isange.lease', sel.leaseId)">Open Lease</button>
                                             </div>
                                         </div>
+
+                                        <!-- Inline Edit Monthly Rent / Due Date / End Lease -->
+                                        <t t-if="sel.leaseId and state.rentMgr.showEditLease">
+                                            <div class="o_isg_fl_form">
+                                                <div class="o_isg_fl_form_head">
+                                                    <strong>Adjust Rent or Due Date — <t t-out="sel.tenant"/></strong>
+                                                    <button type="button" class="o_isg_text_btn" t-on-click="() => { state.rentMgr.showEditLease = false; }">Cancel</button>
+                                                </div>
+                                                <div class="o_isg_fl_grid_2">
+                                                    <label class="o_isg_fl_field_lbl">
+                                                        <span>Monthly Rent (<t t-out="state.currency"/>)</span>
+                                                        <input type="number" min="1" step="1000" class="o_isg_field o_isg_num"
+                                                            t-att-value="state.rentMgr.editRentAmount"
+                                                            t-on-input="(ev) => { state.rentMgr.editRentAmount = ev.target.value; }"/>
+                                                    </label>
+                                                    <label class="o_isg_fl_field_lbl">
+                                                        <span>Next Rent Due Date</span>
+                                                        <input type="date" class="o_isg_field o_isg_num"
+                                                            t-att-value="state.rentMgr.editNextDueDate"
+                                                            t-on-input="(ev) => { state.rentMgr.editNextDueDate = ev.target.value; }"/>
+                                                    </label>
+                                                </div>
+                                                <div class="o_isg_fl_form_foot">
+                                                    <t t-if="!state.rentMgr.confirmEndLease">
+                                                        <button type="button" class="o_isg_text_btn o_isg_c_rose"
+                                                            t-on-click="() => { state.rentMgr.confirmEndLease = true; }">
+                                                            <i class="fa fa-sign-out me-1"/>End Lease / Mark Vacant
+                                                        </button>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="o_isg_c_rose small fw-semibold">Mark unit vacant?</span>
+                                                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs o_isg_c_rose"
+                                                                t-att-disabled="state.rentMgr.busy"
+                                                                t-on-click="() => this.endSelectedLease()">Yes, End Lease</button>
+                                                            <button type="button" class="o_isg_text_btn"
+                                                                t-on-click="() => { state.rentMgr.confirmEndLease = false; }">No</button>
+                                                        </div>
+                                                    </t>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                                        t-att-disabled="state.rentMgr.busy"
+                                                        t-on-click="() => this.saveLeaseEdit()">
+                                                        <i class="fa fa-check me-1"/>Save Rent Terms
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </t>
                                     </div>
                                 </t>
                                 <t t-else="">
