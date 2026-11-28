@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -176,7 +178,39 @@ class IsangeProperty(models.Model):
                 if pr.get('phone'):
                     partner_phones[str(pr['id'])] = pr['phone']
 
+        is_admin = bool(self.env.user.has_group('base.group_system'))
+        staff_users = []
+        if is_admin:
+            try:
+                with self.env.cr.savepoint():
+                    users = self.env['res.users'].with_context(active_test=False).search(
+                        [('share', '=', False), ('id', '>', 1)],
+                        order='active desc, id asc',
+                    )
+                    for u in users:
+                        role_label = 'Administrator' if u.has_group('base.group_system') else (
+                            'Operations Manager' if (u.has_group('sales_team.group_sale_manager') and u.has_group('stock.group_stock_manager')) else (
+                                'Storekeeper' if u.has_group('stock.group_stock_manager') else (
+                                    'Rentals & Fleet' if u.has_group('fleet.fleet_group_manager') else 'Cashier / Sales'
+                                )
+                            )
+                        )
+                        staff_users.append({
+                            'id': u.id,
+                            'name': u.name or u.login,
+                            'login': u.login,
+                            'phone': u.partner_id.phone or '',
+                            'active': bool(u.active),
+                            'isCurrent': u.id == self.env.user.id,
+                            'role': role_label,
+                            'lastLogin': str(u.login_date)[:16] if u.login_date else '',
+                        })
+            except Exception:
+                staff_users = []
+
         return {
+            'isAdmin': is_admin,
+            'staffUsers': staff_users,
             'currencyInfo': self.get_dashboard_currency_info(),
             'units': units,
             'leases': leases,
@@ -719,6 +753,579 @@ class IsangeProperty(models.Model):
             except Exception:
                 pass
         return {'ok': True, 'service_id': svc.id}
+
+    @api.model
+    def execute_bill_all_due_rents(self, cutoff_date=False):
+        """Generate and post rent invoices for ALL active leases due on or before
+        cutoff_date (defaults to today) in ONE atomic RPC, with double-bill protection."""
+        today = fields.Date.context_today(self)
+        cutoff = fields.Date.to_date(cutoff_date) if cutoff_date else today
+        leases = self.env['isange.lease'].search([
+            ('state', '=', 'active'),
+            ('rent_amount', '>', 0),
+            ('next_invoice_date', '!=', False),
+            ('next_invoice_date', '<=', cutoff),
+        ], order='next_invoice_date asc, id asc')
+
+        created_count = 0
+        skipped_count = 0
+        total_billed = 0.0
+        Move = self.env['account.move']
+        cycle_map = dict(self.env['isange.lease']._fields['billing_cycle'].selection)
+
+        for lease in leases:
+            period_date = lease.next_invoice_date or today
+            # Double-billing protection: skip if an active invoice already exists for this lease + due date
+            existing = Move.search([
+                ('isange_lease_id', '=', lease.id),
+                ('move_type', '=', 'out_invoice'),
+                ('state', '!=', 'cancel'),
+                ('invoice_date_due', '=', period_date),
+            ], limit=1)
+            if existing:
+                skipped_count += 1
+            else:
+                cycle_label = cycle_map.get(lease.billing_cycle, 'Monthly')
+                description = _('Rent for %s (%s - Due %s)') % (
+                    lease.property_id.name,
+                    cycle_label,
+                    period_date,
+                )
+                invoice = Move.create({
+                    'move_type': 'out_invoice',
+                    'partner_id': lease.tenant_id.id,
+                    'currency_id': lease.currency_id.id,
+                    'invoice_date': today,
+                    'invoice_date_due': period_date,
+                    'isange_lease_id': lease.id,
+                    'isange_property_id': lease.property_id.id,
+                    'invoice_origin': lease.name,
+                    'invoice_line_ids': [(0, 0, {
+                        'name': description,
+                        'quantity': 1.0,
+                        'price_unit': lease.rent_amount,
+                    })],
+                })
+                invoice.action_post()
+                created_count += 1
+                total_billed += float(lease.rent_amount or 0.0)
+
+            if lease.billing_cycle == 'monthly':
+                lease.next_invoice_date = period_date + relativedelta(months=1)
+            elif lease.billing_cycle == 'quarterly':
+                lease.next_invoice_date = period_date + relativedelta(months=3)
+            elif lease.billing_cycle == 'yearly':
+                lease.next_invoice_date = period_date + relativedelta(years=1)
+
+        return {
+            'ok': True,
+            'created_count': created_count,
+            'skipped_count': skipped_count,
+            'total_billed': total_billed,
+            'cutoff_date': str(cutoff),
+        }
+
+    @api.model
+    def get_daily_sales_report(self, report_date=False):
+        """Close-of-Day Sales, Cash-Up (Cash / MTN MoMo / Bank / Credit),
+        Items Sold, Rent Collections & Outflows report in ONE atomic RPC."""
+        tz_name = self.env.user.tz or 'Africa/Kigali'
+        try:
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            tz = timezone(timedelta(hours=2))
+
+        target_date = fields.Date.to_date(report_date) if report_date else fields.Date.context_today(self)
+        local_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=tz)
+        local_end = local_start + timedelta(days=1)
+        start_utc = local_start.astimezone(timezone.utc).replace(tzinfo=None)
+        end_utc = local_end.astimezone(timezone.utc).replace(tzinfo=None)
+
+        currency_info = self.get_dashboard_currency_info()
+        rates = currency_info.get('rates') or {}
+
+        def _conv(amount, cur):
+            if not cur:
+                return float(amount or 0.0)
+            cid = cur.id if hasattr(cur, 'id') else (cur[0] if isinstance(cur, (list, tuple)) else int(cur))
+            return float(amount or 0.0) * float(rates.get(cid, 1.0))
+
+        def _classify_journal(name, jtype=''):
+            nm = (name or '').lower()
+            if 'momo' in nm or 'mobile' in nm:
+                return 'momo'
+            if jtype == 'cash' or 'cash' in nm:
+                return 'cash'
+            return 'bank'
+
+        def _local_time_str(dt_val):
+            if not dt_val:
+                return ''
+            if isinstance(dt_val, str):
+                dt_val = fields.Datetime.to_datetime(dt_val)
+            return dt_val.replace(tzinfo=timezone.utc).astimezone(tz).strftime('%H:%M')
+
+        # 1. Hardware Sales: Confirmed Sale Orders + POS Orders on target_date
+        product_agg = {}
+        sales_rows = []
+        hw_total = 0.0
+        hw_tax = 0.0
+        hw_cost = 0.0
+        hw_credit_due = 0.0
+        hw_orders_count = 0
+
+        try:
+            with self.env.cr.savepoint():
+                orders = self.env['sale.order'].search([
+                    ('state', 'in', ['sale', 'done']),
+                    ('date_order', '>=', start_utc),
+                    ('date_order', '<', end_utc),
+                ], order='date_order desc, id desc')
+                for so in orders:
+                    amt = _conv(so.amount_total, so.currency_id)
+                    tax = _conv(so.amount_tax, so.currency_id)
+                    hw_total += amt
+                    hw_tax += tax
+                    hw_orders_count += 1
+                    line_summaries = []
+                    for line in so.order_line:
+                        if line.display_type or not line.product_id:
+                            continue
+                        qty = float(line.product_uom_qty or 0.0)
+                        rev = _conv(line.price_subtotal, so.currency_id)
+                        unit_cost = float(line.product_id.standard_price or 0.0)
+                        cost = qty * unit_cost
+                        hw_cost += cost
+                        pid = line.product_id.id
+                        entry = product_agg.setdefault(pid, {
+                            'id': pid,
+                            'name': line.product_id.name,
+                            'uom': line.product_uom_id.name if hasattr(line, 'product_uom_id') and line.product_uom_id else (line.product_id.uom_id.name or 'Units'),
+                            'qty': 0.0,
+                            'revenue': 0.0,
+                            'cost': 0.0,
+                        })
+                        entry['qty'] += qty
+                        entry['revenue'] += rev
+                        entry['cost'] += cost
+                        line_summaries.append(f"{int(qty) if qty.is_integer() else round(qty, 1)}x {line.product_id.name}")
+
+                    # Linked posted invoice status
+                    posted_invs = so.invoice_ids.filtered(lambda m: m.move_type == 'out_invoice' and m.state == 'posted')
+                    inv = posted_invs[:1]
+                    due = sum(abs(float(m.amount_residual_signed or 0.0)) for m in posted_invs)
+                    hw_credit_due += due
+                    paid = max(0.0, amt - due) if posted_invs else 0.0
+                    status = (
+                        'Paid' if (posted_invs and due <= 0.5) else
+                        'Partial' if (posted_invs and paid > 0.5) else
+                        'Credit' if posted_invs else 'Confirmed'
+                    )
+                    sales_rows.append({
+                        'id': so.id,
+                        'model': 'sale.order',
+                        'invId': inv.id if inv else False,
+                        'ref': so.name,
+                        'invName': inv.name if inv else '',
+                        'time': _local_time_str(so.date_order),
+                        'customer': so.partner_id.name or 'Walk-in Customer',
+                        'items': ', '.join(line_summaries[:3]) + (f' +{len(line_summaries) - 3} more' if len(line_summaries) > 3 else ''),
+                        'amount': amt,
+                        'due': due,
+                        'source': 'Quick Sale / SO',
+                        'status': status,
+                    })
+        except Exception:
+            pass
+
+        pos_cash_in = 0.0
+        pos_momo_in = 0.0
+        pos_bank_in = 0.0
+        try:
+            if 'pos.order' in self.env:
+                with self.env.cr.savepoint():
+                    pos_orders = self.env['pos.order'].search([
+                        ('state', 'in', ['paid', 'done', 'invoiced']),
+                        ('date_order', '>=', start_utc),
+                        ('date_order', '<', end_utc),
+                    ], order='date_order desc, id desc')
+                    for po in pos_orders:
+                        amt = _conv(po.amount_total, po.currency_id)
+                        tax = _conv(po.amount_tax, po.currency_id)
+                        hw_total += amt
+                        hw_tax += tax
+                        hw_orders_count += 1
+                        line_summaries = []
+                        for line in po.lines:
+                            if not line.product_id:
+                                continue
+                            qty = float(line.qty or 0.0)
+                            rev = _conv(line.price_subtotal, po.currency_id)
+                            cost = qty * float(line.product_id.standard_price or 0.0)
+                            hw_cost += cost
+                            pid = line.product_id.id
+                            entry = product_agg.setdefault(pid, {
+                                'id': pid,
+                                'name': line.product_id.name,
+                                'uom': line.product_id.uom_id.name or 'Units',
+                                'qty': 0.0,
+                                'revenue': 0.0,
+                                'cost': 0.0,
+                            })
+                            entry['qty'] += qty
+                            entry['revenue'] += rev
+                            entry['cost'] += cost
+                            line_summaries.append(f"{int(qty) if qty.is_integer() else round(qty, 1)}x {line.product_id.name}")
+                        for pay in po.payment_ids:
+                            p_amt = _conv(pay.amount, po.currency_id)
+                            pm_name = pay.payment_method_id.name or ''
+                            jtype = pay.payment_method_id.journal_id.type if pay.payment_method_id.journal_id else ''
+                            bucket = _classify_journal(pm_name, jtype)
+                            if bucket == 'cash':
+                                pos_cash_in += p_amt
+                            elif bucket == 'momo':
+                                pos_momo_in += p_amt
+                            else:
+                                pos_bank_in += p_amt
+                        sales_rows.append({
+                            'id': po.id,
+                            'model': 'pos.order',
+                            'invId': po.account_move.id if po.account_move else False,
+                            'ref': po.name or po.pos_reference or f"POS/{po.id}",
+                            'invName': po.account_move.name if po.account_move else '',
+                            'time': _local_time_str(po.date_order),
+                            'customer': po.partner_id.name if po.partner_id else 'Walk-in POS',
+                            'items': ', '.join(line_summaries[:3]) + (f' +{len(line_summaries) - 3} more' if len(line_summaries) > 3 else ''),
+                            'amount': amt,
+                            'due': 0.0,
+                            'source': 'POS Counter',
+                            'status': 'Paid',
+                        })
+        except Exception:
+            pass
+
+        items_sold = sorted(
+            [
+                {
+                    **item,
+                    'avgPrice': round(item['revenue'] / item['qty']) if item['qty'] > 0 else 0,
+                    'profit': item['revenue'] - item['cost'],
+                    'marginPct': round(((item['revenue'] - item['cost']) / item['revenue']) * 100) if item['revenue'] > 0 else 0,
+                }
+                for item in product_agg.values()
+            ],
+            key=lambda x: x['revenue'],
+            reverse=True,
+        )
+
+        # 2. Inbound Accounting Payments Recorded on target_date (split Hardware vs Rent)
+        hw_cash_in = pos_cash_in
+        hw_momo_in = pos_momo_in
+        hw_bank_in = pos_bank_in
+        rent_cash_in = 0.0
+        rent_momo_in = 0.0
+        rent_bank_in = 0.0
+        rent_payment_rows = []
+
+        try:
+            with self.env.cr.savepoint():
+                payments = self.env['account.payment'].search([
+                    ('payment_type', '=', 'inbound'),
+                    ('state', 'in', ['in_process', 'paid', 'posted']),
+                    ('date', '=', target_date),
+                ], order='id desc')
+                for p in payments:
+                    amt = _conv(p.amount, p.currency_id)
+                    jname = p.journal_id.name if p.journal_id else ''
+                    jtype = p.journal_id.type if p.journal_id else ''
+                    bucket = _classify_journal(jname, jtype)
+                    method_label = 'Cash' if bucket == 'cash' else ('MTN MoMo' if bucket == 'momo' else 'Bank Transfer')
+
+                    reconciled_invs = getattr(p, 'reconciled_invoice_ids', self.env['account.move'])
+                    memo_str = str(getattr(p, 'memo', '') or getattr(p, 'ref', '') or '')
+                    is_rent = bool(
+                        reconciled_invs.filtered(lambda m: m.isange_property_id)
+                        or 'RENT/' in memo_str.upper()
+                    )
+                    if is_rent:
+                        if bucket == 'cash':
+                            rent_cash_in += amt
+                        elif bucket == 'momo':
+                            rent_momo_in += amt
+                        else:
+                            rent_bank_in += amt
+                        first_inv = reconciled_invs[:1]
+                        rent_payment_rows.append({
+                            'id': p.id,
+                            'invId': first_inv.id if first_inv else False,
+                            'invName': first_inv.name if first_inv else memo_str or p.name,
+                            'tenant': p.partner_id.name if p.partner_id else 'Tenant',
+                            'amount': amt,
+                            'method': method_label,
+                            'bucket': bucket,
+                            'ref': memo_str or p.name,
+                        })
+                    else:
+                        if bucket == 'cash':
+                            hw_cash_in += amt
+                        elif bucket == 'momo':
+                            hw_momo_in += amt
+                        else:
+                            hw_bank_in += amt
+        except Exception:
+            pass
+
+        # 3. Day's Outflows: Fleet Fuel, Fleet Maintenance, Property Repairs
+        fuel_out = 0.0
+        maint_out = 0.0
+        prop_exp_out = 0.0
+        outflow_rows = []
+        try:
+            with self.env.cr.savepoint():
+                svcs = self.env['fleet.vehicle.log.services'].search([
+                    ('date', '=', target_date),
+                    ('state', '!=', 'cancelled'),
+                ], order='id desc')
+                for s in svcs:
+                    amt = _conv(s.amount, s.currency_id)
+                    st_name = s.service_type_id.name if s.service_type_id else 'Maintenance'
+                    is_fuel = 'fuel' in (st_name or '').lower()
+                    if is_fuel:
+                        fuel_out += amt
+                    else:
+                        maint_out += amt
+                    outflow_rows.append({
+                        'id': s.id,
+                        'model': 'fleet.vehicle.log.services',
+                        'category': 'Fuel' if is_fuel else 'Maintenance',
+                        'label': f"{s.vehicle_id.license_plate or s.vehicle_id.name} — {st_name}",
+                        'detail': s.description or '',
+                        'amount': amt,
+                    })
+        except Exception:
+            pass
+
+        try:
+            with self.env.cr.savepoint():
+                exps = self.env['isange.property.expense'].search([
+                    ('date', '=', target_date),
+                    ('state', '=', 'approved'),
+                ], order='id desc')
+                for e in exps:
+                    amt = _conv(e.amount, e.currency_id)
+                    prop_exp_out += amt
+                    outflow_rows.append({
+                        'id': e.id,
+                        'model': 'isange.property.expense',
+                        'category': 'Property Repair',
+                        'label': f"{e.property_id.name} — {e.name}",
+                        'detail': e.vendor_id.name if e.vendor_id else '',
+                        'amount': amt,
+                    })
+        except Exception:
+            pass
+
+        # 4. 7-Day Hardware Sales Trend ending on target_date
+        week_days = []
+        week_map = {}
+        for offset in range(6, -1, -1):
+            d = target_date - timedelta(days=offset)
+            key = str(d)
+            entry = {
+                'date': key,
+                'label': d.strftime('%a %d'),
+                'isSelected': d == target_date,
+                'total': 0.0,
+                'orders': 0,
+            }
+            week_days.append(entry)
+            week_map[key] = entry
+
+        week_start_local = local_start - timedelta(days=6)
+        week_start_utc = week_start_local.astimezone(timezone.utc).replace(tzinfo=None)
+        try:
+            with self.env.cr.savepoint():
+                w_sos = self.env['sale.order'].search([
+                    ('state', 'in', ['sale', 'done']),
+                    ('date_order', '>=', week_start_utc),
+                    ('date_order', '<', end_utc),
+                ])
+                for so in w_sos:
+                    ld = so.date_order.replace(tzinfo=timezone.utc).astimezone(tz).date()
+                    slot = week_map.get(str(ld))
+                    if slot:
+                        slot['total'] += _conv(so.amount_total, so.currency_id)
+                        slot['orders'] += 1
+        except Exception:
+            pass
+        try:
+            if 'pos.order' in self.env:
+                with self.env.cr.savepoint():
+                    w_pos = self.env['pos.order'].search([
+                        ('state', 'in', ['paid', 'done', 'invoiced']),
+                        ('date_order', '>=', week_start_utc),
+                        ('date_order', '<', end_utc),
+                    ])
+                    for po in w_pos:
+                        ld = po.date_order.replace(tzinfo=timezone.utc).astimezone(tz).date()
+                        slot = week_map.get(str(ld))
+                        if slot:
+                            slot['total'] += _conv(po.amount_total, po.currency_id)
+                            slot['orders'] += 1
+        except Exception:
+            pass
+
+        week_max = max([d['total'] for d in week_days] + [1.0])
+        for d in week_days:
+            d['pct'] = round((d['total'] / week_max) * 100) if d['total'] > 0 else 0
+
+        hw_profit = hw_total - hw_tax - hw_cost
+        hw_margin = round((hw_profit / (hw_total - hw_tax)) * 100) if (hw_total - hw_tax) > 0 else 0
+        rent_collected_total = rent_cash_in + rent_momo_in + rent_bank_in
+        total_cash_in = hw_cash_in + rent_cash_in
+        total_momo_in = hw_momo_in + rent_momo_in
+        total_bank_in = hw_bank_in + rent_bank_in
+        total_collected_all = total_cash_in + total_momo_in + total_bank_in
+        total_outflows = fuel_out + maint_out + prop_exp_out
+
+        return {
+            'date': str(target_date),
+            'dateLabel': target_date.strftime('%A, %d %B %Y'),
+            'currency': currency_info.get('name') or 'RWF',
+            'summary': {
+                'hwTotal': hw_total,
+                'hwTax': hw_tax,
+                'hwCost': hw_cost,
+                'hwProfit': hw_profit,
+                'hwMarginPct': hw_margin,
+                'hwOrdersCount': hw_orders_count,
+                'hwCreditDue': hw_credit_due,
+                'hwCashIn': hw_cash_in,
+                'hwMomoIn': hw_momo_in,
+                'hwBankIn': hw_bank_in,
+                'rentCollected': rent_collected_total,
+                'rentPaymentsCount': len(rent_payment_rows),
+                'rentCashIn': rent_cash_in,
+                'rentMomoIn': rent_momo_in,
+                'rentBankIn': rent_bank_in,
+                'totalCashIn': total_cash_in,
+                'totalMomoIn': total_momo_in,
+                'totalBankIn': total_bank_in,
+                'totalCollectedAll': total_collected_all,
+                'fuelOut': fuel_out,
+                'maintOut': maint_out,
+                'propExpOut': prop_exp_out,
+                'totalOutflows': total_outflows,
+                'netCash': total_collected_all - total_outflows,
+            },
+            'itemsSold': items_sold,
+            'salesRows': sorted(sales_rows, key=lambda r: r['time'], reverse=True),
+            'rentPayments': rent_payment_rows,
+            'outflows': outflow_rows,
+            'weekTrend': week_days,
+        }
+
+    @api.model
+    def execute_create_staff_user(self, payload):
+        """Admin-only helper to create a dedicated staff login with clean Odoo 19
+        role permissions and Command Center as their home screen."""
+        if not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only an Administrator can create staff accounts.'))
+
+        name = (payload.get('name') or '').strip()
+        login = (payload.get('login') or '').strip().lower()
+        password = payload.get('password') or ''
+        phone = (payload.get('phone') or '').strip()
+        role = (payload.get('role') or 'cashier').strip()
+
+        if not name or not login:
+            raise UserError(_('Enter both the staff member name and login email/username.'))
+        if len(password) < 6:
+            raise UserError(_('Password must be at least 6 characters long.'))
+
+        Users = self.env['res.users'].with_context(active_test=False)
+        if Users.search([('login', '=', login)], limit=1):
+            raise UserError(_('A user with login "%s" already exists.') % login)
+
+        role_groups = {
+            'cashier': [
+                'base.group_user',
+                'sales_team.group_sale_salesman_all_leads',
+                'point_of_sale.group_pos_user',
+                'account.group_account_invoice',
+                'stock.group_stock_user',
+                'base.group_partner_manager',
+            ],
+            'storekeeper': [
+                'base.group_user',
+                'stock.group_stock_manager',
+                'purchase.group_purchase_manager',
+                'sales_team.group_sale_salesman',
+                'base.group_partner_manager',
+            ],
+            'rentals_fleet': [
+                'base.group_user',
+                'account.group_account_invoice',
+                'fleet.fleet_group_manager',
+                'base.group_partner_manager',
+            ],
+            'manager': [
+                'base.group_user',
+                'sales_team.group_sale_manager',
+                'point_of_sale.group_pos_manager',
+                'stock.group_stock_manager',
+                'purchase.group_purchase_manager',
+                'account.group_account_user',
+                'fleet.fleet_group_manager',
+                'base.group_partner_manager',
+            ],
+        }
+        group_xmlids = role_groups.get(role, role_groups['cashier'])
+        group_ids = []
+        for xid in group_xmlids:
+            g = self.env.ref(xid, raise_if_not_found=False)
+            if g:
+                group_ids.append(g.id)
+
+        home_action = self.env.ref('isange_property_fleet.action_isange_command_center', raise_if_not_found=False)
+        group_field = 'group_ids' if 'group_ids' in self.env['res.users']._fields else 'groups_id'
+        vals = {
+            'name': name,
+            'login': login,
+            'email': login if '@' in login else False,
+            'password': password,
+            'tz': 'Africa/Kigali',
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+            group_field: [(6, 0, group_ids)],
+        }
+        if home_action:
+            vals['action_id'] = home_action.id
+
+        user = self.env['res.users'].with_context(no_reset_password=True).create(vals)
+        if phone and user.partner_id:
+            user.partner_id.write({'phone': phone})
+
+        return {
+            'ok': True,
+            'user_id': user.id,
+            'name': user.name,
+            'login': user.login,
+        }
+
+    @api.model
+    def execute_toggle_staff_user(self, user_id, active):
+        """Admin-only helper to archive or reactivate a staff login."""
+        if not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only an Administrator can manage staff accounts.'))
+        uid = int(user_id or 0)
+        if uid in (1, 2, self.env.user.id):
+            raise UserError(_('You cannot deactivate the main Administrator or your own account.'))
+        user = self.env['res.users'].with_context(active_test=False).browse(uid)
+        if not user.exists():
+            raise UserError(_('User not found.'))
+        user.write({'active': bool(active)})
+        return {'ok': True, 'user_id': user.id, 'active': bool(user.active)}
 
     def action_new_lease(self):
         """One-click button on a house to create a new Tenant Lease."""

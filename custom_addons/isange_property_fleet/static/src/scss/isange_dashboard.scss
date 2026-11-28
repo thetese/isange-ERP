@@ -2792,6 +2792,169 @@
         font-weight: 650;
     }
 
+    // Daily Sales Report & Staff Accounts Manager
+    .o_isg_field_date {
+        width: auto;
+        min-width: 132px;
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .o_isg_batch_confirm {
+        background: var(--isg-blue-tint);
+        border-color: var(--isg-blue);
+    }
+
+    .o_isg_daily_cashup {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--isg-border);
+        background: var(--isg-surface-subtle);
+
+        @media (max-width: 900px) {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .o_isg_daily_cu_card {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--isg-surface);
+        border: 1px solid var(--isg-border);
+
+        > strong {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--isg-text-strong);
+
+            small {
+                font-size: 11px;
+                font-weight: 500;
+                color: var(--isg-text-muted);
+            }
+        }
+    }
+
+    .o_isg_daily_cu_lbl {
+        font-size: 11px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--isg-text-muted);
+    }
+
+    .o_isg_daily_split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        background: var(--isg-surface);
+
+        @media (max-width: 960px) {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    .o_isg_daily_pane {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border-right: 1px solid var(--isg-border);
+
+        &:last-child {
+            border-right: none;
+        }
+    }
+
+    .o_isg_daily_pane_head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--isg-text-strong);
+    }
+
+    .o_isg_daily_week {
+        margin-top: auto;
+        padding-top: 12px;
+        border-top: 1px solid var(--isg-border-soft);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .o_isg_daily_bars {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 6px;
+        align-items: end;
+    }
+
+    .o_isg_daily_bar_col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 4px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.12s ease;
+
+        &:hover {
+            background: var(--isg-surface-hover);
+            border-color: var(--isg-border);
+        }
+
+        &.is_selected {
+            background: var(--isg-blue-tint);
+            border-color: var(--isg-blue);
+
+            .o_isg_daily_bar_fill {
+                background: var(--isg-blue);
+            }
+
+            .o_isg_daily_bar_lbl {
+                color: var(--isg-blue);
+                font-weight: 700;
+            }
+        }
+    }
+
+    .o_isg_daily_bar_val {
+        font-size: 10px;
+        color: var(--isg-text-muted);
+    }
+
+    .o_isg_daily_bar_track {
+        width: 100%;
+        max-width: 24px;
+        height: 54px;
+        border-radius: 4px;
+        background: var(--isg-surface-subtle);
+        display: flex;
+        align-items: flex-end;
+        overflow: hidden;
+    }
+
+    .o_isg_daily_bar_fill {
+        width: 100%;
+        min-height: 2px;
+        border-radius: 4px 4px 0 0;
+        background: var(--isg-text-faint);
+    }
+
+    .o_isg_daily_bar_lbl {
+        font-size: 10.5px;
+        color: var(--isg-text-muted);
+    }
+
     // Selected Vehicle Right Panel
     .o_isg_fl_head_icon {
         width: 40px;

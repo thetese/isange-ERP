@@ -202,8 +202,10 @@ export class IsangeDashboard extends Component {
         );
         this.state = useState({
             loading: true,
+            isAdmin: false,
             greeting: "",
             today: "",
+            todayIso: "",
             currency: "RWF",
             kpi: {
                 salesMonth: 0,
@@ -320,7 +322,26 @@ export class IsangeDashboard extends Component {
                 payMethod: "momo", // 'momo' | 'cash' | 'bank'
                 payDate: "",
                 payNote: "",
+                confirmBatchBill: false,
                 lastReceipt: null,
+            },
+            // ---------------- Daily Sales & Cash-Up Report State ----------------
+            dailyReport: {
+                open: false,
+                loading: false,
+                date: "",
+                data: null,
+            },
+            // ---------------- Staff Accounts Manager State (Admin) ----------------
+            staffMgr: {
+                open: false,
+                busy: false,
+                users: [],
+                name: "",
+                login: "",
+                phone: "",
+                role: "cashier",
+                password: "",
             },
             // ---------------- Vehicle & Fleet Management State ----------------
             fleetMgr: {
@@ -689,6 +710,12 @@ export class IsangeDashboard extends Component {
         const hour = now.hour;
         this.state.greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
         this.state.today = now.setLocale("en-GB").toFormat("cccc d LLLL yyyy");
+        this.state.todayIso = todayStr;
+        this.state.isAdmin = Boolean(raw.isAdmin);
+        this.state.staffMgr.users = raw.staffUsers || [];
+        if (!this.state.dailyReport.date) {
+            this.state.dailyReport.date = todayStr;
+        }
 
         const currencyInfo = raw.currencyInfo || { name: "RWF", symbol: "RWF", rates: {} };
         const units = raw.units || [];
@@ -1476,18 +1503,329 @@ export class IsangeDashboard extends Component {
         this.state.loading = false;
     }
 
+    _closeAllWorkspaces(except = "") {
+        if (except !== "fastSale") {
+            this.state.fastSale.open = false;
+        }
+        if (except !== "stockMgr") {
+            this.state.stockMgr.open = false;
+        }
+        if (except !== "rentMgr") {
+            this.state.rentMgr.open = false;
+        }
+        if (except !== "fleetMgr") {
+            this.state.fleetMgr.open = false;
+        }
+        if (except !== "dailyReport") {
+            this.state.dailyReport.open = false;
+        }
+        if (except !== "staffMgr") {
+            this.state.staffMgr.open = false;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Daily Sales & Close-of-Day Cash-Up Report
+    // ------------------------------------------------------------------
+
+    async toggleDailyReport(forceOpen = null, dateStr = null) {
+        const dr = this.state.dailyReport;
+        const nextOpen = forceOpen !== null ? forceOpen : !dr.open;
+        dr.open = nextOpen;
+        if (nextOpen) {
+            this._closeAllWorkspaces("dailyReport");
+            if (dateStr) {
+                dr.date = dateStr;
+            } else if (!dr.date) {
+                dr.date = DateTime.local().toISODate();
+            }
+            const scroller = document.querySelector(".o_isange_dashboard");
+            if (scroller && scroller.scrollTop > 120) {
+                scroller.scrollTo({ top: 0, behavior: "smooth" });
+            }
+            await this.loadDailyReport(dr.date);
+        }
+    }
+
+    async loadDailyReport(dateStr = null) {
+        const dr = this.state.dailyReport;
+        const target = dateStr || dr.date || DateTime.local().toISODate();
+        dr.date = target;
+        dr.loading = true;
+        try {
+            const data = await this.orm.call("isange.property", "get_daily_sales_report", [target]);
+            dr.data = data;
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not load daily sales report. Try refreshing.", { type: "danger" });
+        } finally {
+            dr.loading = false;
+        }
+    }
+
+    async setDailyReportPreset(offsetDays = 0) {
+        const target = DateTime.local().plus({ days: offsetDays }).toISODate();
+        await this.loadDailyReport(target);
+    }
+
+    printDailyReport() {
+        const data = this.state.dailyReport.data;
+        if (!data) {
+            return;
+        }
+        const s = data.summary || {};
+        const cur = data.currency || this.state.currency || "RWF";
+        const esc = (str) =>
+            String(str ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        const itemsHtml = (data.itemsSold || []).length
+            ? data.itemsSold
+                  .map(
+                      (it) => `<tr>
+                    <td>${esc(it.name)}</td>
+                    <td class="num">${this.fmt(it.qty)} ${esc(it.uom)}</td>
+                    <td class="num">${this.fmt(it.avgPrice)}</td>
+                    <td class="num"><strong>${this.fmt(it.revenue)}</strong></td>
+                    <td class="num">${this.fmt(it.profit)} (${it.marginPct}%)</td>
+                </tr>`
+                  )
+                  .join("")
+            : `<tr><td colspan="5" style="text-align:center;color:#64748b">No hardware items sold on this date.</td></tr>`;
+
+        const salesHtml = (data.salesRows || []).length
+            ? data.salesRows
+                  .map(
+                      (r) => `<tr>
+                    <td>${esc(r.time)}</td>
+                    <td><strong>${esc(r.ref)}</strong></td>
+                    <td>${esc(r.customer)}</td>
+                    <td>${esc(r.items)}</td>
+                    <td>${esc(r.status)}</td>
+                    <td class="num"><strong>${this.fmt(r.amount)}</strong></td>
+                </tr>`
+                  )
+                  .join("")
+            : `<tr><td colspan="6" style="text-align:center;color:#64748b">No sales transactions recorded.</td></tr>`;
+
+        const rentHtml = (data.rentPayments || []).length
+            ? data.rentPayments
+                  .map(
+                      (rp) => `<tr>
+                    <td>${esc(rp.invName)}</td>
+                    <td>${esc(rp.tenant)}</td>
+                    <td>${esc(rp.method)}</td>
+                    <td class="num"><strong>${this.fmt(rp.amount)}</strong></td>
+                </tr>`
+                  )
+                  .join("")
+            : `<tr><td colspan="4" style="text-align:center;color:#64748b">No rent payments collected on this date.</td></tr>`;
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Isange Hardware — Daily Sales &amp; Cash-Up Report (${esc(data.date)})</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 24px; font-size: 12px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #002266; padding-bottom: 12px; margin-bottom: 16px; }
+  h1 { margin: 0 0 4px; font-size: 18px; color: #002266; }
+  h2 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+  .meta { color: #475569; font-size: 11px; line-height: 1.45; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; background: #f8fafc; }
+  .box span { display: block; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+  .box strong { display: block; font-size: 15px; margin-top: 3px; }
+  .box small { display: block; color: #64748b; font-size: 10.5px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  th, td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+  th { background: #f1f5f9; font-size: 10.5px; text-transform: uppercase; color: #475569; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .foot { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+  @media print { body { margin: 12px; } }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>ISANGE HARDWARE LTD — DAILY SALES &amp; CASH-UP REPORT</h1>
+      <div class="meta">Gisozi, Gasabo District, Kigali, Rwanda · Tel: +250 794 766 952 · TIN: 109047885</div>
+    </div>
+    <div style="text-align:right">
+      <strong>${esc(data.dateLabel)}</strong>
+      <div class="meta">Currency: ${esc(cur)}</div>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="box"><span>Hardware Sales</span><strong>${this.fmt(s.hwTotal)} ${esc(cur)}</strong><small>${s.hwOrdersCount || 0} orders · Est. Profit ${this.fmt(s.hwProfit)} (${s.hwMarginPct || 0}%)</small></div>
+    <div class="box"><span>Cash Collected</span><strong>${this.fmt(s.totalCashIn)} ${esc(cur)}</strong><small>Sales ${this.fmt(s.hwCashIn)} · Rent ${this.fmt(s.rentCashIn)}</small></div>
+    <div class="box"><span>MTN MoMo &amp; Bank</span><strong>${this.fmt((s.totalMomoIn || 0) + (s.totalBankIn || 0))} ${esc(cur)}</strong><small>MoMo ${this.fmt(s.totalMomoIn)} · Bank ${this.fmt(s.totalBankIn)}</small></div>
+    <div class="box"><span>Net Cash (In − Out)</span><strong>${this.fmt(s.netCash)} ${esc(cur)}</strong><small>Rent In ${this.fmt(s.rentCollected)} · Out ${this.fmt(s.totalOutflows)}</small></div>
+  </div>
+  <h2>Products Sold (${(data.itemsSold || []).length})</h2>
+  <table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Avg Price</th><th class="num">Revenue (${esc(cur)})</th><th class="num">Est. Profit</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+  <h2>Sales Transactions (${(data.salesRows || []).length})</h2>
+  <table><thead><tr><th>Time</th><th>Ref</th><th>Customer</th><th>Items</th><th>Status</th><th class="num">Total (${esc(cur)})</th></tr></thead><tbody>${salesHtml}</tbody></table>
+  <h2>Rent Payments Collected (${(data.rentPayments || []).length})</h2>
+  <table><thead><tr><th>Invoice</th><th>Tenant</th><th>Method</th><th class="num">Paid (${esc(cur)})</th></tr></thead><tbody>${rentHtml}</tbody></table>
+  <div class="foot">
+    <span>Prepared by: ________________________</span>
+    <span>Approved by: ________________________</span>
+    <span>Printed from Isange Command Center</span>
+  </div>
+</body>
+</html>`;
+        const win = window.open("", "_blank", "width=920,height=740");
+        if (!win) {
+            this.notification.add("Allow pop-ups to print the Daily Sales Report.", { type: "warning" });
+            return;
+        }
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 250);
+    }
+
+    // ------------------------------------------------------------------
+    // Staff User Accounts Manager (Admin-only)
+    // ------------------------------------------------------------------
+
+    toggleStaffManager(forceOpen = null) {
+        const sm = this.state.staffMgr;
+        const nextOpen = forceOpen !== null ? forceOpen : !sm.open;
+        sm.open = nextOpen;
+        if (nextOpen) {
+            this._closeAllWorkspaces("staffMgr");
+            const scroller = document.querySelector(".o_isange_dashboard");
+            if (scroller && scroller.scrollTop > 120) {
+                scroller.scrollTo({ top: 0, behavior: "smooth" });
+            }
+        }
+    }
+
+    async createStaffUser() {
+        const sm = this.state.staffMgr;
+        if (sm.busy) {
+            return;
+        }
+        const name = (sm.name || "").trim();
+        const login = (sm.login || "").trim();
+        const password = sm.password || "";
+        if (!name || !login) {
+            this.notification.add("Enter both full name and login email/username.", { type: "warning" });
+            return;
+        }
+        if (password.length < 6) {
+            this.notification.add("Password must be at least 6 characters.", { type: "warning" });
+            return;
+        }
+        sm.busy = true;
+        try {
+            const res = await this.orm.call("isange.property", "execute_create_staff_user", [
+                {
+                    name,
+                    login,
+                    phone: (sm.phone || "").trim(),
+                    role: sm.role || "cashier",
+                    password,
+                },
+            ]);
+            sm.name = "";
+            sm.login = "";
+            sm.phone = "";
+            sm.password = "";
+            await this.loadData();
+            this.notification.add(
+                `Staff login "${(res && res.login) || login}" created and ready to sign in!`,
+                { title: "Staff Account Created", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            const msg = (err && err.data && err.data.message) || "Could not create staff user.";
+            this.notification.add(msg, { type: "danger" });
+        } finally {
+            sm.busy = false;
+        }
+    }
+
+    async toggleStaffActive(user) {
+        const sm = this.state.staffMgr;
+        if (sm.busy || !user || user.isCurrent) {
+            return;
+        }
+        sm.busy = true;
+        try {
+            await this.orm.call("isange.property", "execute_toggle_staff_user", [user.id, !user.active]);
+            await this.loadData();
+            this.notification.add(
+                `${user.name} (${user.login}) ${user.active ? "deactivated" : "reactivated"}.`,
+                { title: "Account Updated", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not update staff account.", { type: "danger" });
+        } finally {
+            sm.busy = false;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Rent Collection & Overdue Manager (All Tenants, 1-Click Payment)
     // ------------------------------------------------------------------
+
+    get dueLeasesSummary() {
+        const today = this.state.todayIso || DateTime.local().toISODate();
+        const leases = this.state.rentMgr.leases || [];
+        let count = 0;
+        let totalAmount = 0;
+        for (const l of leases) {
+            if (l.next_invoice_date && l.next_invoice_date <= today) {
+                count += 1;
+                totalAmount += Number(l.rent_amount) || 0;
+            }
+        }
+        return { count, totalAmount, cutoffDate: today };
+    }
+
+    async billAllDueRents() {
+        const rm = this.state.rentMgr;
+        if (rm.busy) {
+            return;
+        }
+        const due = this.dueLeasesSummary;
+        if (!due.count) {
+            this.notification.add("All active leases are already billed up to today.", { type: "info" });
+            rm.confirmBatchBill = false;
+            return;
+        }
+        rm.busy = true;
+        try {
+            const res = await this.orm.call("isange.property", "execute_bill_all_due_rents", [due.cutoffDate]);
+            rm.confirmBatchBill = false;
+            await this.loadData();
+            rm.filter = "unpaid";
+            this.notification.add(
+                `Posted ${(res && res.created_count) || 0} rent invoices totaling ${this.fmt((res && res.total_billed) || 0)} ${this.state.currency}${res && res.skipped_count ? ` (${res.skipped_count} already billed skipped)` : ""}.`,
+                { title: "Monthly Rents Billed", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not batch-bill due leases. Please try again.", { type: "danger" });
+        } finally {
+            rm.busy = false;
+        }
+    }
 
     toggleRentManager(forceOpen = null, filter = null, invoiceId = null) {
         const rm = this.state.rentMgr;
         const nextOpen = forceOpen !== null ? forceOpen : !rm.open;
         rm.open = nextOpen;
         if (nextOpen) {
-            this.state.fastSale.open = false;
-            this.state.stockMgr.open = false;
-            this.state.fleetMgr.open = false;
+            this._closeAllWorkspaces("rentMgr");
+            rm.confirmBatchBill = false;
             if (filter) {
                 rm.filter = filter;
             }
@@ -1740,9 +2078,7 @@ export class IsangeDashboard extends Component {
         const nextOpen = forceOpen !== null ? forceOpen : !fm.open;
         fm.open = nextOpen;
         if (nextOpen) {
-            this.state.fastSale.open = false;
-            this.state.stockMgr.open = false;
-            this.state.rentMgr.open = false;
+            this._closeAllWorkspaces("fleetMgr");
             if (vehicleId) {
                 const target = fm.vehicles.find((v) => v.id === vehicleId);
                 if (target) {
@@ -2493,9 +2829,7 @@ export class IsangeDashboard extends Component {
         const nextOpen = forceOpen !== null ? forceOpen : !sm.open;
         sm.open = nextOpen;
         if (nextOpen) {
-            this.state.fastSale.open = false;
-            this.state.fleetMgr.open = false;
-            this.state.rentMgr.open = false;
+            this._closeAllWorkspaces("stockMgr");
         }
     }
 
@@ -2898,9 +3232,7 @@ export class IsangeDashboard extends Component {
         const nextOpen = forceOpen !== null ? forceOpen : !fs.open;
         fs.open = nextOpen;
         if (nextOpen) {
-            this.state.stockMgr.open = false;
-            this.state.fleetMgr.open = false;
-            this.state.rentMgr.open = false;
+            this._closeAllWorkspaces("fastSale");
         }
     }
 

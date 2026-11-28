@@ -33,6 +33,13 @@
                         </button>
 
                         <button type="button"
+                            t-attf-class="o_isg_btn o_isg_btn_sec {{ state.dailyReport.open ? 'is_active' : '' }}"
+                            t-on-click="() => this.toggleDailyReport()">
+                            <i class="fa fa-bar-chart me-1"/>
+                            <span>Daily Report</span>
+                        </button>
+
+                        <button type="button"
                             t-attf-class="o_isg_btn o_isg_btn_sec {{ state.stockMgr.open ? 'is_active' : '' }}"
                             t-on-click="() => this.toggleStockManager()">
                             <i class="fa fa-cubes me-1"/>
@@ -87,6 +94,11 @@
                         </div>
 
                         <div class="o_isg_toolbar_group">
+                            <button t-if="state.isAdmin" type="button"
+                                t-attf-class="o_isg_btn o_isg_btn_sec {{ state.staffMgr.open ? 'is_active' : '' }}"
+                                t-on-click="() => this.toggleStaffManager()" title="Manage Staff Logins &amp; Roles">
+                                <i class="fa fa-users me-1"/>Staff
+                            </button>
                             <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.printBusinessReport()" title="Export Executive Report PDF">
                                 <i class="fa fa-download me-1"/>Report PDF
                             </button>
@@ -99,6 +111,388 @@
             </header>
 
             <div class="o_isg_body">
+
+                <!-- ============ DAILY SALES & CASH-UP REPORT ============ -->
+                <t t-if="state.dailyReport.open">
+                    <section class="o_isg_terminal o_isg_daily_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator"/>
+                                <h2>Daily Sales &amp; Cash-Up Report</h2>
+                                <span class="o_isg_terminal_meta">
+                                    <t t-if="state.dailyReport.data"><t t-out="state.dailyReport.data.dateLabel"/></t>
+                                    <t t-else="">Close-of-Day Hardware Sales, Cash / MoMo / Bank Totals &amp; Rent Collected</t>
+                                </span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <div class="o_isg_seg_tabs mb-0">
+                                    <button type="button"
+                                        t-attf-class="o_isg_seg_tab {{ state.dailyReport.date === state.todayIso ? 'active' : '' }}"
+                                        t-on-click="() => this.setDailyReportPreset(0)">Today</button>
+                                    <button type="button"
+                                        class="o_isg_seg_tab"
+                                        t-on-click="() => this.setDailyReportPreset(-1)">Yesterday</button>
+                                </div>
+                                <input type="date" class="o_isg_field o_isg_field_date o_isg_num"
+                                    t-att-value="state.dailyReport.date"
+                                    t-on-change="(ev) => this.loadDailyReport(ev.target.value)"/>
+                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                    t-att-disabled="!state.dailyReport.data or state.dailyReport.loading"
+                                    t-on-click="() => this.printDailyReport()">
+                                    <i class="fa fa-print me-1"/>Print Report
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                    t-att-disabled="state.dailyReport.loading"
+                                    t-on-click="() => this.loadDailyReport()">
+                                    <i t-attf-class="fa fa-refresh {{ state.dailyReport.loading ? 'fa-spin' : '' }}"/>
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleDailyReport(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <t t-if="state.dailyReport.loading and !state.dailyReport.data">
+                            <div class="o_isg_empty"><div><i class="fa fa-spinner fa-spin me-2"/>Loading daily sales report…</div></div>
+                        </t>
+                        <t t-elif="state.dailyReport.data">
+                            <t t-set="dr" t-value="state.dailyReport.data"/>
+                            <t t-set="ds" t-value="dr.summary"/>
+
+                            <!-- 4-Column Daily KPI Summary -->
+                            <div class="o_isg_stock_summary_strip">
+                                <div class="o_isg_stock_stat">
+                                    <span class="o_isg_stock_stat_lbl">Hardware Sales (<t t-out="dr.date"/>)</span>
+                                    <div class="o_isg_stock_stat_val o_isg_num o_isg_c_blue">
+                                        <t t-out="fmt(ds.hwTotal)"/>
+                                        <small> <t t-out="dr.currency"/></small>
+                                    </div>
+                                    <span class="o_isg_stock_stat_sub o_isg_num">
+                                        <t t-out="ds.hwOrdersCount"/> orders · Est. Profit <strong class="o_isg_c_green"><t t-out="fmt(ds.hwProfit)"/></strong> (<t t-out="ds.hwMarginPct"/>%)
+                                    </span>
+                                </div>
+                                <div class="o_isg_stock_stat">
+                                    <span class="o_isg_stock_stat_lbl">Total Money Collected</span>
+                                    <div class="o_isg_stock_stat_val o_isg_num o_isg_c_green">
+                                        <t t-out="fmt(ds.totalCollectedAll)"/>
+                                        <small> <t t-out="dr.currency"/></small>
+                                    </div>
+                                    <span class="o_isg_stock_stat_sub o_isg_num">
+                                        Cash <t t-out="fmtShort(ds.totalCashIn)"/> · MoMo <t t-out="fmtShort(ds.totalMomoIn)"/> · Bank <t t-out="fmtShort(ds.totalBankIn)"/>
+                                    </span>
+                                </div>
+                                <div class="o_isg_stock_stat">
+                                    <span class="o_isg_stock_stat_lbl">Rent Collected Today</span>
+                                    <div class="o_isg_stock_stat_val o_isg_num">
+                                        <t t-out="fmt(ds.rentCollected)"/>
+                                        <small> <t t-out="dr.currency"/></small>
+                                    </div>
+                                    <span class="o_isg_stock_stat_sub o_isg_num">
+                                        <t t-out="ds.rentPaymentsCount"/> tenant rent payments recorded
+                                    </span>
+                                </div>
+                                <div class="o_isg_stock_stat">
+                                    <span class="o_isg_stock_stat_lbl">Net Cash (In − Out)</span>
+                                    <div t-attf-class="o_isg_stock_stat_val o_isg_num {{ ds.netCash &lt; 0 ? 'o_isg_c_rose' : 'o_isg_c_green' }}">
+                                        <t t-out="fmt(ds.netCash)"/>
+                                        <small> <t t-out="dr.currency"/></small>
+                                    </div>
+                                    <span class="o_isg_stock_stat_sub o_isg_num">
+                                        Outflows: <t t-out="fmt(ds.totalOutflows)"/> (Fuel <t t-out="fmtShort(ds.fuelOut)"/> · Maint <t t-out="fmtShort(ds.maintOut)"/>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- 4-Card Payment Method Cash-Up Strip -->
+                            <div class="o_isg_daily_cashup">
+                                <div class="o_isg_daily_cu_card">
+                                    <span class="o_isg_daily_cu_lbl"><i class="fa fa-money me-1 o_isg_c_green"/>Cash Drawer</span>
+                                    <strong class="o_isg_num"><t t-out="fmt(ds.totalCashIn)"/> <small><t t-out="dr.currency"/></small></strong>
+                                    <small class="o_isg_muted o_isg_num">Hardware <t t-out="fmt(ds.hwCashIn)"/> · Rent <t t-out="fmt(ds.rentCashIn)"/></small>
+                                </div>
+                                <div class="o_isg_daily_cu_card">
+                                    <span class="o_isg_daily_cu_lbl"><i class="fa fa-mobile me-1 o_isg_c_amber"/>MTN MoMo (0794766952)</span>
+                                    <strong class="o_isg_num"><t t-out="fmt(ds.totalMomoIn)"/> <small><t t-out="dr.currency"/></small></strong>
+                                    <small class="o_isg_muted o_isg_num">Hardware <t t-out="fmt(ds.hwMomoIn)"/> · Rent <t t-out="fmt(ds.rentMomoIn)"/></small>
+                                </div>
+                                <div class="o_isg_daily_cu_card">
+                                    <span class="o_isg_daily_cu_lbl"><i class="fa fa-university me-1 o_isg_c_blue"/>Bank Transfer</span>
+                                    <strong class="o_isg_num"><t t-out="fmt(ds.totalBankIn)"/> <small><t t-out="dr.currency"/></small></strong>
+                                    <small class="o_isg_muted o_isg_num">Hardware <t t-out="fmt(ds.hwBankIn)"/> · Rent <t t-out="fmt(ds.rentBankIn)"/></small>
+                                </div>
+                                <div class="o_isg_daily_cu_card">
+                                    <span class="o_isg_daily_cu_lbl"><i class="fa fa-clock-o me-1 o_isg_c_rose"/>Credit / Unpaid Sales</span>
+                                    <strong t-attf-class="o_isg_num {{ ds.hwCreditDue &gt; 0 ? 'o_isg_c_rose' : '' }}"><t t-out="fmt(ds.hwCreditDue)"/> <small><t t-out="dr.currency"/></small></strong>
+                                    <small class="o_isg_muted">Unpaid balance from today's sales</small>
+                                </div>
+                            </div>
+
+                            <!-- 2-Pane Daily Detail -->
+                            <div class="o_isg_daily_split">
+                                <!-- LEFT: Products Sold & 7-Day Sparkline -->
+                                <div class="o_isg_daily_pane">
+                                    <div class="o_isg_daily_pane_head">
+                                        <strong>Products Sold (<t t-out="dr.itemsSold.length"/>)</strong>
+                                        <span class="o_isg_muted small">Sorted by revenue</span>
+                                    </div>
+                                    <t t-if="dr.itemsSold.length">
+                                        <div class="o_isg_table_wrap">
+                                            <table class="o_isg_table">
+                                                <thead>
+                                                    <tr><th>Product</th><th class="text-end">Qty</th><th class="text-end">Revenue</th><th class="text-end">Est. Profit</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                    <t t-foreach="dr.itemsSold" t-as="it" t-key="it.id">
+                                                        <tr>
+                                                            <td>
+                                                                <div class="o_isg_person_name"><t t-out="it.name"/></div>
+                                                                <div class="o_isg_muted small o_isg_num">@ <t t-out="fmt(it.avgPrice)"/> <t t-out="dr.currency"/></div>
+                                                            </td>
+                                                            <td class="text-end o_isg_num"><t t-out="fmt(it.qty)"/> <small class="o_isg_muted"><t t-out="it.uom"/></small></td>
+                                                            <td class="text-end fw-semibold o_isg_num"><t t-out="fmt(it.revenue)"/></td>
+                                                            <td class="text-end o_isg_num">
+                                                                <span class="o_isg_c_green fw-semibold"><t t-out="fmt(it.profit)"/></span>
+                                                                <small class="o_isg_muted"> (<t t-out="it.marginPct"/>%)</small>
+                                                            </td>
+                                                        </tr>
+                                                    </t>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="o_isg_empty o_isg_empty_sm">
+                                            <div>No hardware items sold on <t t-out="dr.date"/></div>
+                                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs mt-2" t-on-click="() => this.toggleFastSale(true)">
+                                                <i class="fa fa-plus me-1"/>Record a Quick Sale
+                                            </button>
+                                        </div>
+                                    </t>
+
+                                    <!-- 7-Day Hardware Sales Mini Chart (clickable days) -->
+                                    <div class="o_isg_daily_week">
+                                        <div class="o_isg_daily_pane_head">
+                                            <strong>Last 7 Days Hardware Sales</strong>
+                                            <span class="o_isg_muted small">Click any day to inspect</span>
+                                        </div>
+                                        <div class="o_isg_daily_bars">
+                                            <t t-foreach="dr.weekTrend" t-as="wd" t-key="wd.date">
+                                                <button type="button"
+                                                    t-attf-class="o_isg_daily_bar_col {{ wd.isSelected ? 'is_selected' : '' }}"
+                                                    t-on-click="() => this.loadDailyReport(wd.date)">
+                                                    <span class="o_isg_daily_bar_val o_isg_num"><t t-out="fmtShort(wd.total)"/></span>
+                                                    <div class="o_isg_daily_bar_track">
+                                                        <div class="o_isg_daily_bar_fill" t-attf-style="height: {{ wd.pct }}%"/>
+                                                    </div>
+                                                    <span class="o_isg_daily_bar_lbl"><t t-out="wd.label"/></span>
+                                                </button>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- RIGHT: Sales Transactions, Rent Collections & Outflows -->
+                                <div class="o_isg_daily_pane">
+                                    <div class="o_isg_daily_pane_head">
+                                        <strong>Sales Ledger (<t t-out="dr.salesRows.length"/>)</strong>
+                                        <span class="o_isg_muted small">Quick Sale &amp; POS</span>
+                                    </div>
+                                    <t t-if="dr.salesRows.length">
+                                        <div class="o_isg_fl_feed">
+                                            <t t-foreach="dr.salesRows" t-as="sr" t-key="sr.model + '_' + sr.id">
+                                                <div class="o_isg_fl_card">
+                                                    <div class="o_isg_fl_card_top">
+                                                        <div class="o_isg_fl_card_meta">
+                                                            <span class="o_isg_mono"><t t-out="sr.ref"/></span>
+                                                            <span class="o_isg_muted small o_isg_num"><t t-out="sr.time"/></span>
+                                                            <span t-attf-class="o_isg_status_badge {{ sr.status === 'Paid' ? 'o_isg_status_emerald' : (sr.status === 'Partial' ? 'o_isg_status_amber' : 'o_isg_status_rose') }}">
+                                                                <i class="o_isg_status_dot"/><t t-out="sr.status"/>
+                                                            </span>
+                                                        </div>
+                                                        <div class="o_isg_fl_card_actions">
+                                                            <strong class="o_isg_num"><t t-out="fmt(sr.amount)"/> <small class="o_isg_muted"><t t-out="dr.currency"/></small></strong>
+                                                            <button t-if="sr.invId" type="button" class="o_isg_text_btn" t-on-click="() => this.printInvoicePdf(sr.invId)">PDF</button>
+                                                            <button type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord(sr.model, sr.id)">Open</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="o_isg_muted small">
+                                                        <strong><t t-out="sr.customer"/></strong>
+                                                        <t t-if="sr.items"> · <t t-out="sr.items"/></t>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="o_isg_empty o_isg_empty_sm"><div>No sales transactions on this date</div></div>
+                                    </t>
+
+                                    <t t-if="dr.rentPayments.length">
+                                        <div class="o_isg_daily_pane_head mt-3">
+                                            <strong>Rent Payments Collected (<t t-out="dr.rentPayments.length"/>)</strong>
+                                            <span class="o_isg_c_green fw-semibold o_isg_num"><t t-out="fmt(ds.rentCollected)"/> <t t-out="dr.currency"/></span>
+                                        </div>
+                                        <div class="o_isg_fl_feed">
+                                            <t t-foreach="dr.rentPayments" t-as="rp" t-key="rp.id">
+                                                <div class="o_isg_fl_card">
+                                                    <div class="o_isg_fl_card_top">
+                                                        <div class="o_isg_fl_card_meta">
+                                                            <strong><t t-out="rp.tenant"/></strong>
+                                                            <span class="o_isg_status_badge o_isg_status_emerald"><i class="o_isg_status_dot"/><t t-out="rp.method"/></span>
+                                                        </div>
+                                                        <div class="o_isg_fl_card_actions">
+                                                            <strong class="o_isg_num o_isg_c_green">+<t t-out="fmt(rp.amount)"/></strong>
+                                                            <button t-if="rp.invId" type="button" class="o_isg_text_btn" t-on-click="() => this.printInvoicePdf(rp.invId)">PDF</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="o_isg_muted small"><t t-out="rp.invName"/></div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+
+                                    <t t-if="dr.outflows.length">
+                                        <div class="o_isg_daily_pane_head mt-3">
+                                            <strong>Day's Expenses — Fuel, Maint. &amp; Repairs (<t t-out="dr.outflows.length"/>)</strong>
+                                            <span class="o_isg_c_rose fw-semibold o_isg_num">−<t t-out="fmt(ds.totalOutflows)"/> <t t-out="dr.currency"/></span>
+                                        </div>
+                                        <div class="o_isg_fl_feed">
+                                            <t t-foreach="dr.outflows" t-as="of" t-key="of.model + '_' + of.id">
+                                                <div class="o_isg_fl_card">
+                                                    <div class="o_isg_fl_card_top">
+                                                        <div class="o_isg_fl_card_meta">
+                                                            <span class="o_isg_status_badge o_isg_status_amber"><i class="o_isg_status_dot"/><t t-out="of.category"/></span>
+                                                            <strong><t t-out="of.label"/></strong>
+                                                        </div>
+                                                        <strong class="o_isg_num o_isg_c_rose">−<t t-out="fmt(of.amount)"/></strong>
+                                                    </div>
+                                                    <div t-if="of.detail" class="o_isg_muted small"><t t-out="of.detail"/></div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                    </section>
+                </t>
+
+                <!-- ============ STAFF ACCOUNTS MANAGER (ADMIN ONLY) ============ -->
+                <t t-if="state.staffMgr.open and state.isAdmin">
+                    <section class="o_isg_terminal o_isg_staff_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator"/>
+                                <h2>Staff Accounts &amp; Role Access</h2>
+                                <span class="o_isg_terminal_meta">Create Dedicated Logins for Cashier, Storekeeper &amp; Rentals/Fleet Staff</span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openList('res.users', 'All Users')">
+                                    <i class="fa fa-external-link me-1"/>Odoo Users
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleStaffManager(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="o_isg_daily_split">
+                            <!-- LEFT: Existing Staff Accounts -->
+                            <div class="o_isg_daily_pane">
+                                <div class="o_isg_daily_pane_head">
+                                    <strong>Active &amp; Archived Logins (<t t-out="state.staffMgr.users.length"/>)</strong>
+                                    <span class="o_isg_muted small">Each staff user opens directly on Command Center</span>
+                                </div>
+                                <div class="o_isg_fl_feed">
+                                    <t t-foreach="state.staffMgr.users" t-as="u" t-key="u.id">
+                                        <div class="o_isg_fl_card">
+                                            <div class="o_isg_fl_card_top">
+                                                <div class="o_isg_fl_card_meta">
+                                                    <span class="o_isg_avatar"><t t-out="initials(u.name)"/></span>
+                                                    <div>
+                                                        <strong><t t-out="u.name"/></strong>
+                                                        <div class="o_isg_muted small">
+                                                            <span class="o_isg_mono"><t t-out="u.login"/></span>
+                                                            <t t-if="u.phone"> · <t t-out="u.phone"/></t>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="o_isg_fl_card_actions">
+                                                    <span class="o_isg_status_badge o_isg_status_slate"><t t-out="u.role"/></span>
+                                                    <span t-attf-class="o_isg_status_badge {{ u.active ? 'o_isg_status_emerald' : 'o_isg_status_rose' }}">
+                                                        <i class="o_isg_status_dot"/><t t-if="u.active">Active</t><t t-else="">Disabled</t>
+                                                    </span>
+                                                    <button t-if="!u.isCurrent and u.id !== 2" type="button"
+                                                        class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                        t-att-disabled="state.staffMgr.busy"
+                                                        t-on-click="() => this.toggleStaffActive(u)">
+                                                        <t t-if="u.active">Disable</t><t t-else="">Enable</t>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT: Create New Staff Login -->
+                            <div class="o_isg_daily_pane">
+                                <div class="o_isg_fl_form">
+                                    <div class="o_isg_fl_form_head">
+                                        <strong><i class="fa fa-user-plus me-1 o_isg_c_blue"/>Add New Staff Account</strong>
+                                    </div>
+                                    <div class="o_isg_fl_grid_2">
+                                        <label class="o_isg_fl_field_lbl">
+                                            <span>Full Name *</span>
+                                            <input type="text" class="o_isg_field"
+                                                placeholder="e.g. Aline Mukamana"
+                                                t-att-value="state.staffMgr.name"
+                                                t-on-input="(ev) => { state.staffMgr.name = ev.target.value; }"/>
+                                        </label>
+                                        <label class="o_isg_fl_field_lbl">
+                                            <span>Login Email or Username *</span>
+                                            <input type="text" class="o_isg_field"
+                                                placeholder="e.g. cashier@isange.rw"
+                                                t-att-value="state.staffMgr.login"
+                                                t-on-input="(ev) => { state.staffMgr.login = ev.target.value; }"/>
+                                        </label>
+                                    </div>
+                                    <div class="o_isg_fl_grid_2">
+                                        <label class="o_isg_fl_field_lbl">
+                                            <span>Password (min 6 chars) *</span>
+                                            <input type="password" class="o_isg_field"
+                                                placeholder="Set staff password"
+                                                t-att-value="state.staffMgr.password"
+                                                t-on-input="(ev) => { state.staffMgr.password = ev.target.value; }"/>
+                                        </label>
+                                        <label class="o_isg_fl_field_lbl">
+                                            <span>Phone <span class="o_isg_muted">(optional)</span></span>
+                                            <input type="text" class="o_isg_field"
+                                                placeholder="078..."
+                                                t-att-value="state.staffMgr.phone"
+                                                t-on-input="(ev) => { state.staffMgr.phone = ev.target.value; }"/>
+                                        </label>
+                                    </div>
+                                    <div class="o_isg_fl_field_lbl">
+                                        <span>Role &amp; Permissions</span>
+                                        <div class="o_isg_adj_reasons">
+                                            <button type="button" t-attf-class="o_isg_cust_pill {{ state.staffMgr.role === 'cashier' ? 'active' : '' }}" t-on-click="() => { state.staffMgr.role = 'cashier'; }">Cashier / Counter Sales</button>
+                                            <button type="button" t-attf-class="o_isg_cust_pill {{ state.staffMgr.role === 'storekeeper' ? 'active' : '' }}" t-on-click="() => { state.staffMgr.role = 'storekeeper'; }">Storekeeper / Stock</button>
+                                            <button type="button" t-attf-class="o_isg_cust_pill {{ state.staffMgr.role === 'rentals_fleet' ? 'active' : '' }}" t-on-click="() => { state.staffMgr.role = 'rentals_fleet'; }">Rentals &amp; Fleet</button>
+                                            <button type="button" t-attf-class="o_isg_cust_pill {{ state.staffMgr.role === 'manager' ? 'active' : '' }}" t-on-click="() => { state.staffMgr.role = 'manager'; }">Operations Manager</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="o_isg_adj_apply"
+                                        t-att-disabled="state.staffMgr.busy"
+                                        t-on-click="() => this.createStaffUser()">
+                                        <i t-attf-class="fa {{ state.staffMgr.busy ? 'fa-spinner fa-spin' : 'fa-user-plus' }} me-1"/>
+                                        Create Staff Login
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </t>
 
                 <!-- ============ EXPRESS SALE & SETTLEMENT TERMINAL ============ -->
                 <t t-if="state.fastSale.open">
@@ -898,10 +1292,16 @@
                                 <span class="o_isg_terminal_meta">All Overdue Tenants, 1-Click Cash / MoMo / Bank Payment &amp; Monthly Billing</span>
                             </div>
                             <div class="o_isg_terminal_actions">
+                                <button t-if="dueLeasesSummary.count &gt; 0" type="button"
+                                    class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                    t-att-disabled="state.rentMgr.busy"
+                                    t-on-click="() => { state.rentMgr.confirmBatchBill = !state.rentMgr.confirmBatchBill; }">
+                                    <i class="fa fa-calendar-check-o me-1"/>Bill All Due (<t t-out="dueLeasesSummary.count"/>)
+                                </button>
                                 <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openOutstandingRent()">
                                     <i class="fa fa-external-link me-1"/>All Invoices
                                 </button>
-                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.newLease()">
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.newLease()">
                                     <i class="fa fa-plus me-1"/>New Lease
                                 </button>
                                 <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleRentManager(false)">
@@ -909,6 +1309,30 @@
                                 </button>
                             </div>
                         </div>
+
+                        <!-- Batch Monthly Rent Billing Confirmation Strip -->
+                        <t t-if="state.rentMgr.confirmBatchBill and dueLeasesSummary.count &gt; 0">
+                            <div class="o_isg_fast_receipt o_isg_batch_confirm">
+                                <div class="o_isg_fast_receipt_info">
+                                    <i class="fa fa-calendar-check-o o_isg_c_blue me-2"/>
+                                    <strong>Bill <t t-out="dueLeasesSummary.count"/> due leases?</strong>
+                                    <span class="o_isg_muted"> Totaling </span>
+                                    <strong class="o_isg_num"><t t-out="fmt(dueLeasesSummary.totalAmount)"/> <t t-out="state.currency"/></strong>
+                                    <span class="o_isg_muted"> (due on or before <t t-out="dueLeasesSummary.cutoffDate"/> · already-billed dates are safely skipped)</span>
+                                </div>
+                                <div class="o_isg_fast_receipt_actions">
+                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                        t-att-disabled="state.rentMgr.busy"
+                                        t-on-click="() => this.billAllDueRents()">
+                                        <i t-attf-class="fa {{ state.rentMgr.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>Confirm &amp; Post All
+                                    </button>
+                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                        t-on-click="() => { state.rentMgr.confirmBatchBill = false; }">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
 
                         <!-- Post-payment confirmation strip -->
                         <t t-if="state.rentMgr.lastReceipt">
@@ -1991,7 +2415,7 @@
 
                 <!-- ============ FINANCIAL KPI STRIP ============ -->
                 <div class="o_isg_kpis">
-                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.openSales()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openSales())">
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.toggleDailyReport(true)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleDailyReport(true))">
                         <div class="o_isg_kpi_head">
                             <span class="o_isg_kpi_label">Hardware Revenue</span>
                             <span class="o_isg_kpi_badge">MTD</span>
@@ -2002,7 +2426,7 @@
                         </div>
                         <div class="o_isg_kpi_meta">
                             <span class="o_isg_meta_accent o_isg_c_blue"><t t-out="state.kpi.salesCount"/> confirmed orders</span>
-                            <span>Sales &amp; POS</span>
+                            <span class="o_isg_c_blue">Daily Report →</span>
                         </div>
                     </div>
 
