@@ -52,7 +52,7 @@ def install_custom_asset_versioning() -> None:
     orig_fget = orig_prop.fget
 
     def _patched_last_modified(self):
-        if self._last_modified is None and self._filename and not self.bundle.is_debug_assets:
+        if self._last_modified is None and self._filename and not getattr(self.bundle, 'is_debug_assets', False):
             token = _custom_file_token(self._filename)
             if token is not None:
                 self._last_modified = token

@@ -689,6 +689,34 @@ def application(environ: dict, start_response):
     if path in ('/api/init-db', '/_vercel_odoo/init-db'):
         return _handle_init_db(environ, start_response)
 
+    # One-click browser recovery route (outside /odoo SW scope): sends
+    # Clear-Site-Data to unregister any stuck Odoo PWA Service Worker and wipe
+    # odoo-sw-cache across all tabs, then redirects cleanly to /odoo.
+    if path in ('/reset', '/web/reset'):
+        html_body = (
+            b'<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+            b'<title>Refreshing Isange ERP...</title>'
+            b'<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;'
+            b'justify-content:center;height:100vh;margin:0;background:#0f172a;color:#f8fafc;}'
+            b'.box{text-align:center;max-width:380px;padding:24px;}</style></head>'
+            b'<body><div class="box"><h2>Clearing offline cache...</h2>'
+            b'<p>Opening Isange Command Center...</p></div>'
+            b'<script>(async()=>{try{if("serviceWorker" in navigator){'
+            b'const regs=await navigator.serviceWorker.getRegistrations();'
+            b'await Promise.all(regs.map(r=>r.unregister()));}'
+            b'if("caches" in window){const ks=await caches.keys();'
+            b'await Promise.all(ks.map(k=>caches.delete(k)));}}'
+            b'catch(e){}location.replace("/odoo");})();</script></body></html>'
+        )
+        headers = [
+            ('Content-Type', 'text/html; charset=utf-8'),
+            ('Content-Length', str(len(html_body))),
+            ('Cache-Control', 'no-store, max-age=0'),
+            ('Clear-Site-Data', '"cache", "storage"'),
+        ]
+        start_response('200 OK', headers)
+        return [html_body]
+
     # Replace Odoo's PWA Service Worker with a self-cleaning uninstaller on Vercel.
     # Odoo's default SW caches /odoo HTML and traps users on "You are offline"
     # whenever a serverless cold start or deployment cutover resets a navigation fetch.
