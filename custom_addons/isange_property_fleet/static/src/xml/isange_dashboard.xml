@@ -44,6 +44,17 @@
                         </button>
 
                         <button type="button"
+                            t-attf-class="o_isg_btn o_isg_btn_sec {{ state.rentMgr.open ? 'is_active' : '' }}"
+                            t-on-click="() => this.toggleRentManager()">
+                            <i class="fa fa-home me-1"/>
+                            <span>Rent &amp; Overdue</span>
+                            <span t-if="state.kpi.overdueCount &gt; 0"
+                                class="o_isg_toolbar_alert o_isg_num">
+                                <t t-out="state.kpi.overdueCount"/>
+                            </span>
+                        </button>
+
+                        <button type="button"
                             t-attf-class="o_isg_btn o_isg_btn_sec {{ state.fleetMgr.open ? 'is_active' : '' }}"
                             t-on-click="() => this.toggleFleetManager()">
                             <i class="fa fa-truck me-1"/>
@@ -877,14 +888,390 @@
                     </section>
                 </t>
 
+                <!-- ============ RENT COLLECTION & OVERDUE MANAGER ============ -->
+                <t t-if="state.rentMgr.open">
+                    <section class="o_isg_terminal o_isg_rent_terminal">
+                        <div class="o_isg_terminal_bar">
+                            <div class="o_isg_terminal_title">
+                                <span class="o_isg_terminal_indicator o_isg_ind_rose"/>
+                                <h2>Rent Collection &amp; Overdue Manager</h2>
+                                <span class="o_isg_terminal_meta">All Overdue Tenants, 1-Click Cash / MoMo / Bank Payment &amp; Monthly Billing</span>
+                            </div>
+                            <div class="o_isg_terminal_actions">
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openOutstandingRent()">
+                                    <i class="fa fa-external-link me-1"/>All Invoices
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.newLease()">
+                                    <i class="fa fa-plus me-1"/>New Lease
+                                </button>
+                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleRentManager(false)">
+                                    <i class="fa fa-times me-1"/>Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Post-payment confirmation strip -->
+                        <t t-if="state.rentMgr.lastReceipt">
+                            <div class="o_isg_fast_receipt">
+                                <div class="o_isg_fast_receipt_info">
+                                    <i class="fa fa-check-circle o_isg_c_green me-2"/>
+                                    <strong><t t-out="state.rentMgr.lastReceipt.tenant"/></strong>
+                                    <span class="o_isg_muted"> (<t t-out="state.rentMgr.lastReceipt.site"/> · <t t-out="state.rentMgr.lastReceipt.invName"/>) · </span>
+                                    <strong class="o_isg_num"><t t-out="fmt(state.rentMgr.lastReceipt.amount)"/> <t t-out="state.currency"/></strong>
+                                    <span class="o_isg_status_badge o_isg_status_emerald ms-2">
+                                        <i class="o_isg_status_dot"/>
+                                        <t t-out="state.rentMgr.lastReceipt.method"/>
+                                        <t t-if="state.rentMgr.lastReceipt.fullyPaid"> · Fully Paid</t>
+                                        <t t-else=""> · Rem. <t t-out="fmt(state.rentMgr.lastReceipt.residual)"/></t>
+                                    </span>
+                                </div>
+                                <div class="o_isg_fast_receipt_actions">
+                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.printInvoicePdf(state.rentMgr.lastReceipt.invId)">
+                                        <i class="fa fa-print me-1"/>Print Receipt PDF
+                                    </button>
+                                    <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openRecord('account.move', state.rentMgr.lastReceipt.invId)">
+                                        Open Invoice
+                                    </button>
+                                    <button type="button" class="o_isg_btn o_isg_btn_icon o_isg_btn_xs" t-on-click="() => { state.rentMgr.lastReceipt = null; }" title="Dismiss">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
+
+                        <!-- 4-Column Rent Summary Strip -->
+                        <div class="o_isg_stock_summary_strip">
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Overdue Rent Balance</span>
+                                <div t-attf-class="o_isg_stock_stat_val o_isg_num {{ rentSummary.overdueAmount &gt; 0 ? 'o_isg_c_rose' : 'o_isg_c_green' }}">
+                                    <t t-out="fmt(rentSummary.overdueAmount)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="rentSummary.overdueCount"/> overdue tenant invoices past due date
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Collected Rent</span>
+                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_green">
+                                    <t t-out="fmt(rentSummary.totalCollected)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="rentSummary.collectionPct"/>% collected · <t t-out="rentSummary.paidCount"/> fully settled
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Total Unpaid &amp; Partial</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(rentSummary.totalRemaining)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="rentSummary.unpaidCount"/> open balances awaiting payment
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Total Posted Rent</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(rentSummary.totalBilled)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="rentSummary.totalCount"/> invoices across <t t-out="state.rentMgr.sites.length"/> Kigali sites
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Site / Parcel Filter Chips -->
+                        <div class="o_isg_rent_sites_bar">
+                            <button type="button"
+                                t-attf-class="o_isg_rent_site_chip {{ state.rentMgr.site === 'all' ? 'active' : '' }}"
+                                t-on-click="() => this.setRentSite('all')">
+                                <span>All Sites</span>
+                                <strong class="o_isg_num"><t t-out="rentSummary.totalCount"/></strong>
+                            </button>
+                            <t t-foreach="state.rentMgr.sites" t-as="st" t-key="st.name">
+                                <button type="button"
+                                    t-attf-class="o_isg_rent_site_chip {{ state.rentMgr.site === st.name ? 'active' : '' }}"
+                                    t-on-click="() => this.setRentSite(st.name)">
+                                    <span><t t-out="st.name"/></span>
+                                    <strong t-if="st.overdueCount &gt; 0" class="o_isg_num o_isg_c_rose"><t t-out="st.overdueCount"/> due</strong>
+                                    <small t-else="" class="o_isg_num o_isg_c_green">✓</small>
+                                </button>
+                            </t>
+                        </div>
+
+                        <div class="o_isg_fleet_split">
+                            <!-- LEFT: All Overdue / Unpaid / Paid Tenant Invoices -->
+                            <div class="o_isg_stock_list_pane">
+                                <div class="o_isg_stock_toolbar">
+                                    <div class="o_isg_search_field">
+                                        <i class="fa fa-search"/>
+                                        <input type="text"
+                                            placeholder="Search tenant, phone, site or invoice..."
+                                            t-att-value="state.rentMgr.search"
+                                            t-on-input="(ev) => { state.rentMgr.search = ev.target.value; }"/>
+                                        <button t-if="state.rentMgr.search" type="button" class="o_isg_search_clear" t-on-click="() => { state.rentMgr.search = ''; }">
+                                            <i class="fa fa-times"/>
+                                        </button>
+                                    </div>
+                                    <div class="o_isg_seg_tabs mb-0">
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.rentMgr.filter === 'overdue' ? 'active' : '' }}"
+                                            t-on-click="() => this.setRentFilter('overdue')">
+                                            Overdue (<t t-out="rentSummary.overdueCount"/>)
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.rentMgr.filter === 'unpaid' ? 'active' : '' }}"
+                                            t-on-click="() => this.setRentFilter('unpaid')">
+                                            Unpaid (<t t-out="rentSummary.unpaidCount"/>)
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.rentMgr.filter === 'paid' ? 'active' : '' }}"
+                                            t-on-click="() => this.setRentFilter('paid')">
+                                            Paid (<t t-out="rentSummary.paidCount"/>)
+                                        </button>
+                                        <button type="button"
+                                            t-attf-class="o_isg_seg_tab {{ state.rentMgr.filter === 'all' ? 'active' : '' }}"
+                                            t-on-click="() => this.setRentFilter('all')">
+                                            All (<t t-out="rentSummary.totalCount"/>)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="o_isg_fleet_list">
+                                    <t t-foreach="filteredRentInvoices" t-as="inv" t-key="inv.id">
+                                        <div t-attf-class="o_isg_fleet_row o_isg_rent_row {{ selectedRentInvoice and selectedRentInvoice.id === inv.id ? 'is_selected' : '' }}"
+                                            role="button" tabindex="0"
+                                            t-on-click="() => this.selectRentInvoice(inv)"
+                                            t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.selectRentInvoice(inv))">
+                                            <div class="o_isg_fleet_row_top">
+                                                <div class="o_isg_fleet_row_id">
+                                                    <span class="o_isg_avatar"><t t-out="inv.initials"/></span>
+                                                    <div>
+                                                        <div class="o_isg_fleet_row_title"><t t-out="inv.tenant"/></div>
+                                                        <div class="o_isg_muted small">
+                                                            <strong><t t-out="inv.site"/></strong>
+                                                            <t t-if="inv.phone"> · <i class="fa fa-phone"/> <span class="o_isg_num"><t t-out="inv.phone"/></span></t>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="text-end o_isg_num">
+                                                    <div t-attf-class="o_isg_fleet_net {{ inv.isOpen ? 'o_isg_c_rose' : 'o_isg_c_green' }}">
+                                                        <t t-if="inv.isOpen"><t t-out="fmt(inv.residual)"/></t>
+                                                        <t t-else=""><t t-out="fmt(inv.total)"/></t>
+                                                        <small> <t t-out="state.currency"/></small>
+                                                    </div>
+                                                    <div class="o_isg_muted small">
+                                                        <t t-if="inv.isPartial">of <t t-out="fmt(inv.total)"/></t>
+                                                        <t t-elif="inv.isOpen">unpaid</t>
+                                                        <t t-else="">settled</t>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="o_isg_rent_row_foot">
+                                                <span class="o_isg_mono"><t t-out="inv.name"/></span>
+                                                <span class="o_isg_muted small">Due <span class="o_isg_num"><t t-out="inv.due or '—'"/></span></span>
+                                                <span t-if="inv.overdue" class="o_isg_status_badge o_isg_status_rose">
+                                                    <i class="o_isg_status_dot"/>Overdue · <t t-out="inv.daysOverdue"/>d
+                                                </span>
+                                                <span t-elif="inv.isPartial" class="o_isg_status_badge o_isg_status_amber">
+                                                    <i class="o_isg_status_dot"/>Partial
+                                                </span>
+                                                <span t-elif="inv.isOpen" class="o_isg_status_badge o_isg_status_slate">
+                                                    <i class="o_isg_status_dot"/>Unpaid
+                                                </span>
+                                                <span t-else="" class="o_isg_status_badge o_isg_status_emerald">
+                                                    <i class="o_isg_status_dot"/>Paid
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </t>
+                                    <div t-if="!filteredRentInvoices.length" class="o_isg_empty o_isg_empty_sm">
+                                        <div>No rent invoices match this filter</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT: Focused 1-Click Rent Payment & Billing Panel -->
+                            <div class="o_isg_stock_panel_pane">
+                                <t t-set="sel" t-value="selectedRentInvoice"/>
+                                <t t-if="sel">
+                                    <div class="o_isg_adj_head">
+                                        <span class="o_isg_avatar o_isg_rent_head_avatar"><t t-out="sel.initials"/></span>
+                                        <div class="o_isg_adj_head_main">
+                                            <div class="o_isg_fl_head_title">
+                                                <span class="o_isg_adj_name"><t t-out="sel.tenant"/></span>
+                                                <span class="o_isg_plate"><t t-out="sel.site"/></span>
+                                            </div>
+                                            <div class="o_isg_muted small">
+                                                <t t-out="sel.unit"/> · <span class="o_isg_mono"><t t-out="sel.name"/></span>
+                                                <t t-if="sel.phone">
+                                                    · <a t-attf-href="tel:{{ sel.phone }}" class="o_isg_phone_link"><i class="fa fa-phone me-1"/><t t-out="sel.phone"/></a>
+                                                </t>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-1">
+                                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.printInvoicePdf(sel.id)" title="Print Invoice / Receipt PDF">
+                                                <i class="fa fa-print me-1"/>PDF
+                                            </button>
+                                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openRecord('account.move', sel.id)" title="Open full Odoo invoice">
+                                                <i class="fa fa-external-link"/>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- 3 Per-Invoice KPI Tiles -->
+                                    <div class="o_isg_rent_kpis_3">
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Rent Billed</span>
+                                            <strong class="o_isg_num"><t t-out="fmt(sel.total)"/> <small><t t-out="state.currency"/></small></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Paid So Far</span>
+                                            <strong class="o_isg_num o_isg_c_green"><t t-out="fmt(sel.paid)"/> <small><t t-out="state.currency"/></small></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Remaining Due</span>
+                                            <strong t-attf-class="o_isg_num {{ sel.residual &gt; 0 ? 'o_isg_c_rose' : 'o_isg_c_green' }}">
+                                                <t t-out="fmt(sel.residual)"/> <small><t t-out="state.currency"/></small>
+                                            </strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="o_isg_adj_body">
+                                        <t t-if="sel.isOpen">
+                                            <div class="o_isg_fl_form o_isg_rent_pay_box">
+                                                <div class="o_isg_fl_form_head">
+                                                    <strong><i class="fa fa-money me-1 o_isg_c_green"/>Record Rent Payment</strong>
+                                                    <div class="d-flex gap-1">
+                                                        <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.setRentPayQuick(1)">Full Balance</button>
+                                                        <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.setRentPayQuick(0.5)">50% Partial</button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="o_isg_fl_grid_2">
+                                                    <label class="o_isg_fl_field_lbl">
+                                                        <span>Amount Received (<t t-out="state.currency"/>) *</span>
+                                                        <input type="number" min="1" step="1000" class="o_isg_field o_isg_num"
+                                                            t-att-value="state.rentMgr.payAmount"
+                                                            t-on-input="(ev) => { state.rentMgr.payAmount = ev.target.value; }"/>
+                                                    </label>
+                                                    <label class="o_isg_fl_field_lbl">
+                                                        <span>Payment Date</span>
+                                                        <input type="date" class="o_isg_field o_isg_num"
+                                                            t-att-value="state.rentMgr.payDate"
+                                                            t-on-input="(ev) => { state.rentMgr.payDate = ev.target.value; }"/>
+                                                    </label>
+                                                </div>
+
+                                                <div class="o_isg_fl_field_lbl">
+                                                    <span>Payment Method</span>
+                                                    <div class="o_isg_rent_method_grid">
+                                                        <button type="button"
+                                                            t-attf-class="o_isg_cust_pill {{ state.rentMgr.payMethod === 'momo' ? 'active' : '' }}"
+                                                            t-on-click="() => this.setRentPayMethod('momo')">
+                                                            <i class="fa fa-mobile me-1"/>MTN MoMo
+                                                        </button>
+                                                        <button type="button"
+                                                            t-attf-class="o_isg_cust_pill {{ state.rentMgr.payMethod === 'cash' ? 'active' : '' }}"
+                                                            t-on-click="() => this.setRentPayMethod('cash')">
+                                                            <i class="fa fa-money me-1"/>Cash
+                                                        </button>
+                                                        <button type="button"
+                                                            t-attf-class="o_isg_cust_pill {{ state.rentMgr.payMethod === 'bank' ? 'active' : '' }}"
+                                                            t-on-click="() => this.setRentPayMethod('bank')">
+                                                            <i class="fa fa-university me-1"/>Bank Transfer
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <label class="o_isg_fl_field_lbl">
+                                                    <span>Reference / Note <span class="o_isg_muted">(optional)</span></span>
+                                                    <input type="text" class="o_isg_field"
+                                                        placeholder="e.g. MoMo TXN ID, receipt #, or paid by..."
+                                                        t-att-value="state.rentMgr.payNote"
+                                                        t-on-input="(ev) => { state.rentMgr.payNote = ev.target.value; }"/>
+                                                </label>
+
+                                                <div t-attf-class="o_isg_adj_preview {{ rentPayAfter &lt;= 0.5 and rentPayAmountNum &gt; 0 ? 'is_up' : '' }}">
+                                                    <div class="o_isg_adj_pv_col">
+                                                        <span>Paying Now</span>
+                                                        <strong class="o_isg_num o_isg_c_green"><t t-out="fmt(rentPayAmountNum)"/> <t t-out="state.currency"/></strong>
+                                                    </div>
+                                                    <div class="o_isg_adj_pv_col">
+                                                        <span>Balance After Payment</span>
+                                                        <strong t-attf-class="o_isg_num {{ rentPayAfter &lt;= 0.5 ? 'o_isg_c_green' : 'o_isg_c_amber' }}">
+                                                            <t t-if="rentPayAfter &lt;= 0.5">0 (Fully Paid)</t>
+                                                            <t t-else=""><t t-out="fmt(rentPayAfter)"/> <t t-out="state.currency"/></t>
+                                                        </strong>
+                                                    </div>
+                                                </div>
+
+                                                <button type="button" class="o_isg_adj_apply"
+                                                    t-att-disabled="state.rentMgr.busy or rentPayAmountNum &lt;= 0"
+                                                    t-on-click="() => this.recordRentPayment()">
+                                                    <i t-attf-class="fa {{ state.rentMgr.busy ? 'fa-spinner fa-spin' : 'fa-check-circle' }} me-1"/>
+                                                    Record Rent Payment (<t t-out="fmt(rentPayAmountNum)"/> <t t-out="state.currency"/>)
+                                                </button>
+                                            </div>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="o_isg_fl_pnl_card">
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <div>
+                                                        <strong class="o_isg_c_green"><i class="fa fa-check-circle me-1"/>Invoice Fully Paid</strong>
+                                                        <div class="o_isg_muted small mt-1">
+                                                            Settled <strong class="o_isg_num"><t t-out="fmt(sel.total)"/> <t t-out="state.currency"/></strong> · Due date <t t-out="sel.due or '—'"/>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.printInvoicePdf(sel.id)">
+                                                        <i class="fa fa-print me-1"/>Print Receipt
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </t>
+
+                                        <!-- Next Month Lease Billing Bar -->
+                                        <div t-if="sel.leaseId" class="o_isg_fl_odo_bar">
+                                            <div>
+                                                <div class="o_isg_person_name">Active Lease Billing</div>
+                                                <div class="o_isg_muted small">
+                                                    Next rent due: <strong class="o_isg_num"><t t-out="sel.nextBillingDate or 'Ready'"/></strong>
+                                                </div>
+                                            </div>
+                                            <div class="o_isg_fl_odo_inputs">
+                                                <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs"
+                                                    t-att-disabled="state.rentMgr.busy"
+                                                    t-on-click="() => this.billNextMonthRent(sel.leaseId)">
+                                                    <i class="fa fa-calendar-plus-o me-1"/>Bill Next Month
+                                                </button>
+                                                <button type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('isange.lease', sel.leaseId)">Open Lease</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="o_isg_adj_empty">
+                                        <i class="fa fa-check-circle"/>
+                                        <div class="o_isg_adj_empty_title">No rent invoice selected</div>
+                                        <div class="o_isg_muted">Choose a tenant on the left to record a Cash, MTN MoMo, or Bank payment.</div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </section>
+                </t>
+
                 <!-- ============ VEHICLE & FLEET MANAGEMENT TERMINAL ============ -->
                 <t t-if="state.fleetMgr.open">
                     <section class="o_isg_terminal o_isg_fleet_terminal">
                         <div class="o_isg_terminal_bar">
                             <div class="o_isg_terminal_title">
                                 <span class="o_isg_terminal_indicator o_isg_ind_amber"/>
-                                <h2>Vehicle &amp; Fleet Control</h2>
-                                <span class="o_isg_terminal_meta">Per-Vehicle Income, Maintenance Costs &amp; Travel Logs</span>
+                                <h2>Vehicle Maintenance &amp; Fuel Control</h2>
+                                <span class="o_isg_terminal_meta">Truck Maintenance History, Diesel Consumption &amp; L/100km Efficiency</span>
                             </div>
                             <div class="o_isg_terminal_actions">
                                 <div class="o_isg_seg_tabs mb-0">
@@ -907,62 +1294,66 @@
                             </div>
                         </div>
 
-                        <!-- 4-Column Fleet P&L Summary Strip -->
+                        <!-- 4-Column Maintenance & Fuel Summary Strip -->
                         <div class="o_isg_stock_summary_strip">
                             <div class="o_isg_stock_stat">
-                                <span class="o_isg_stock_stat_lbl">Vehicle Income (<t t-out="fleetPeriodLabel"/>)</span>
-                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_green">
-                                    <t t-out="fmt(fleetSummary.income)"/>
-                                    <small> <t t-out="state.currency"/></small>
-                                </div>
-                                <span class="o_isg_stock_stat_sub o_isg_num">
-                                    <t t-out="fleetSummary.tripsCount"/> travels · <t t-out="fmt(fleetSummary.distanceKm)"/> km logged
-                                </span>
-                            </div>
-                            <div class="o_isg_stock_stat">
-                                <span class="o_isg_stock_stat_lbl">Maintenance &amp; Repairs</span>
-                                <div class="o_isg_stock_stat_val o_isg_num">
+                                <span class="o_isg_stock_stat_lbl">Maintenance &amp; Repairs (<t t-out="fleetPeriodLabel"/>)</span>
+                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_amber">
                                     <t t-out="fmt(fleetSummary.maintenance)"/>
                                     <small> <t t-out="state.currency"/></small>
                                 </div>
                                 <span class="o_isg_stock_stat_sub o_isg_num">
-                                    <t t-out="fleetSummary.servicesCount"/> service logs recorded
+                                    <t t-out="fleetSummary.servicesCount"/> garage &amp; service records
                                 </span>
                             </div>
                             <div class="o_isg_stock_stat">
-                                <span class="o_isg_stock_stat_lbl">Fuel &amp; Road Costs</span>
+                                <span class="o_isg_stock_stat_lbl">Fuel Consumption (<t t-out="fleetPeriodLabel"/>)</span>
+                                <div class="o_isg_stock_stat_val o_isg_num o_isg_c_blue">
+                                    <t t-out="fmt(fleetSummary.fuelCost)"/>
+                                    <small> <t t-out="state.currency"/></small>
+                                </div>
+                                <span class="o_isg_stock_stat_sub o_isg_num">
+                                    <t t-out="fmt(fleetSummary.fuelLiters)"/> L across <t t-out="fleetSummary.fuelCount"/> refills
+                                </span>
+                            </div>
+                            <div class="o_isg_stock_stat">
+                                <span class="o_isg_stock_stat_lbl">Avg Fuel Efficiency</span>
                                 <div class="o_isg_stock_stat_val o_isg_num">
-                                    <t t-out="fmt(fleetSummary.tripCost)"/>
-                                    <small> <t t-out="state.currency"/></small>
+                                    <t t-if="fleetSummary.avgLPer100Km &gt; 0">
+                                        <t t-out="fleetSummary.avgLPer100Km"/>
+                                        <small> L/100km</small>
+                                    </t>
+                                    <t t-else="">—<small> L/100km</small></t>
                                 </div>
                                 <span class="o_isg_stock_stat_sub o_isg_num">
-                                    Fuel <t t-out="fmt(fleetSummary.fuelCost)"/> · Other <t t-out="fmt(fleetSummary.otherCost)"/>
+                                    <t t-if="fleetSummary.distanceKm &gt; 0"><t t-out="fmt(fleetSummary.fuelCostPerKm)"/> <t t-out="state.currency"/>/km · <t t-out="fmt(fleetSummary.distanceKm)"/> km tracked</t>
+                                    <t t-else="">Log 2+ fill-ups with odometer to auto-track</t>
                                 </span>
                             </div>
                             <div class="o_isg_stock_stat">
-                                <span class="o_isg_stock_stat_lbl">Fleet Net Profit</span>
-                                <div t-attf-class="o_isg_stock_stat_val o_isg_num {{ fleetSummary.net &lt; 0 ? 'o_isg_c_rose' : (fleetSummary.net &gt; 0 ? 'o_isg_c_green' : '') }}">
-                                    <t t-if="fleetSummary.net &gt; 0">+</t><t t-out="fmt(fleetSummary.net)"/>
+                                <span class="o_isg_stock_stat_lbl">Total Operating Cost</span>
+                                <div class="o_isg_stock_stat_val o_isg_num">
+                                    <t t-out="fmt(fleetSummary.totalOpCost)"/>
                                     <small> <t t-out="state.currency"/></small>
                                 </div>
                                 <span class="o_isg_stock_stat_sub o_isg_num">
-                                    Income less maintenance &amp; trip costs (<t t-out="fleetSummary.marginPct"/>%)
+                                    Maintenance + Fuel across <t t-out="state.fleetMgr.vehicles.length"/> trucks
                                 </span>
                             </div>
                         </div>
 
                         <div class="o_isg_fleet_split">
-                            <!-- LEFT: Vehicle Roster with instant per-vehicle Income / Maintenance / Travels -->
+                            <!-- LEFT: Vehicle Roster with instant Maintenance & Fuel metrics -->
                             <div class="o_isg_stock_list_pane">
                                 <div class="o_isg_stock_toolbar">
                                     <div class="o_isg_search_field">
                                         <i class="fa fa-search"/>
                                         <input type="text"
-                                            placeholder="Search plate, model or driver..."
+                                            placeholder="Search plate, model, driver or phone..."
                                             t-att-value="state.fleetMgr.search"
                                             t-on-input="(ev) => { state.fleetMgr.search = ev.target.value; }"/>
                                     </div>
-                                    <span class="o_isg_muted small o_isg_num"><t t-out="filteredFleetVehicles.length"/> vehicles</span>
+                                    <span class="o_isg_muted small o_isg_num"><t t-out="filteredFleetVehicles.length"/> trucks</span>
                                 </div>
 
                                 <div class="o_isg_fleet_list">
@@ -978,38 +1369,40 @@
                                                         <i class="o_isg_status_dot"/>On Road
                                                     </span>
                                                 </div>
-                                                <div t-attf-class="o_isg_fleet_net o_isg_num {{ v.net &gt; 0 ? 'o_isg_c_green' : (v.net &lt; 0 ? 'o_isg_c_rose' : 'o_isg_muted') }}">
-                                                    <t t-if="v.net &gt; 0">+</t><t t-out="fmt(v.net)"/> <small><t t-out="state.currency"/></small>
+                                                <div class="o_isg_fleet_net o_isg_num">
+                                                    <t t-out="fmt(v.totalOpCost)"/> <small><t t-out="state.currency"/></small>
                                                 </div>
                                             </div>
                                             <div class="o_isg_fleet_row_title"><t t-out="v.name"/></div>
                                             <div class="o_isg_muted small o_isg_fleet_row_sub">
-                                                <span><i class="fa fa-user-o me-1"/><t t-out="v.driver"/></span>
+                                                <span>
+                                                    <i class="fa fa-user-o me-1"/><t t-out="v.driver"/>
+                                                    <t t-if="v.driverPhone"> · <span class="o_isg_num"><t t-out="v.driverPhone"/></span></t>
+                                                </span>
                                                 <span class="o_isg_num"><t t-out="fmt(v.odometer)"/> <t t-out="v.odometerUnit"/></span>
                                             </div>
                                             <div class="o_isg_fleet_row_metrics o_isg_num">
-                                                <div class="o_isg_fl_m">
-                                                    <span>Income</span>
-                                                    <strong class="o_isg_c_green"><t t-out="fmt(v.income)"/></strong>
-                                                </div>
                                                 <div class="o_isg_fl_m">
                                                     <span>Maint.</span>
                                                     <strong t-attf-class="{{ v.maintenance &gt; 0 ? 'o_isg_c_amber' : '' }}"><t t-out="fmt(v.maintenance)"/></strong>
                                                 </div>
                                                 <div class="o_isg_fl_m">
-                                                    <span>Fuel/Trip</span>
-                                                    <strong><t t-out="fmt(v.tripCost)"/></strong>
+                                                    <span>Fuel Cost</span>
+                                                    <strong t-attf-class="{{ v.fuelCost &gt; 0 ? 'o_isg_c_blue' : '' }}"><t t-out="fmt(v.fuelCost)"/></strong>
                                                 </div>
                                                 <div class="o_isg_fl_m">
-                                                    <span>Travels</span>
-                                                    <strong><t t-out="v.tripsCount"/> · <t t-out="fmt(v.distanceKm)"/>km</strong>
+                                                    <span>Fuel (L)</span>
+                                                    <strong><t t-out="fmt(v.fuelLiters)"/> L</strong>
+                                                </div>
+                                                <div class="o_isg_fl_m">
+                                                    <span>L/100km</span>
+                                                    <strong><t t-if="v.avgLPer100Km &gt; 0"><t t-out="v.avgLPer100Km"/></t><t t-else="">—</t></strong>
                                                 </div>
                                             </div>
-                                            <div t-if="v.income &gt; 0 or v.totalCost &gt; 0" class="o_isg_fl_ratio">
-                                                <div class="o_isg_fl_ratio_inc" t-attf-style="width: {{ v.incomeBarPct }}%"/>
+                                            <div t-if="v.totalOpCost &gt; 0" class="o_isg_fl_ratio">
                                                 <div class="o_isg_fl_ratio_cost">
-                                                    <div class="o_isg_fl_ratio_maint" t-attf-style="width: {{ v.maintBarPct }}%"/>
-                                                    <div class="o_isg_fl_ratio_fuel" t-attf-style="width: {{ v.fuelBarPct }}%"/>
+                                                    <div class="o_isg_fl_ratio_maint" t-attf-style="width: {{ pct(v.maintenance, v.totalOpCost) }}%" title="Maintenance"/>
+                                                    <div class="o_isg_fl_ratio_fuel" t-attf-style="width: {{ pct(v.fuelCost, v.totalOpCost) }}%" title="Fuel"/>
                                                 </div>
                                             </div>
                                         </div>
@@ -1020,7 +1413,7 @@
                                 </div>
                             </div>
 
-                            <!-- RIGHT: Selected Vehicle Detail Panel (Travels, Maintenance, P&L) -->
+                            <!-- RIGHT: Selected Vehicle Detail Panel (Maintenance, Fuel, Travels, P&L) -->
                             <div class="o_isg_stock_panel_pane">
                                 <t t-set="veh" t-value="selectedFleetVehicle"/>
                                 <t t-if="veh">
@@ -1032,7 +1425,9 @@
                                                 <span class="o_isg_adj_name"><t t-out="veh.name"/></span>
                                             </div>
                                             <div class="o_isg_muted small">
-                                                <t t-out="veh.driver"/> · <span class="o_isg_num"><t t-out="fmt(veh.odometer)"/> <t t-out="veh.odometerUnit"/></span>
+                                                <t t-out="veh.driver"/>
+                                                <t t-if="veh.driverPhone"> · <a t-attf-href="tel:{{ veh.driverPhone }}" class="o_isg_phone_link"><i class="fa fa-phone me-1"/><t t-out="veh.driverPhone"/></a></t>
+                                                · <span class="o_isg_num"><t t-out="fmt(veh.odometer)"/> <t t-out="veh.odometerUnit"/></span>
                                             </div>
                                         </div>
                                         <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openRecord('fleet.vehicle', veh.id)" title="Open full vehicle record">
@@ -1040,50 +1435,173 @@
                                         </button>
                                     </div>
 
-                                    <!-- 4 Per-Vehicle KPI Tiles -->
+                                    <!-- 4 Per-Vehicle Maintenance & Fuel KPI Tiles -->
                                     <div class="o_isg_fl_kpis">
-                                        <div class="o_isg_fl_kpi">
-                                            <span>Income</span>
-                                            <strong class="o_isg_num o_isg_c_green"><t t-out="fmt(veh.income)"/></strong>
-                                        </div>
                                         <div class="o_isg_fl_kpi">
                                             <span>Maintenance</span>
                                             <strong t-attf-class="o_isg_num {{ veh.maintenance &gt; 0 ? 'o_isg_c_amber' : '' }}"><t t-out="fmt(veh.maintenance)"/></strong>
                                         </div>
                                         <div class="o_isg_fl_kpi">
-                                            <span>Fuel &amp; Road</span>
-                                            <strong class="o_isg_num"><t t-out="fmt(veh.tripCost)"/></strong>
+                                            <span>Fuel Spend</span>
+                                            <strong t-attf-class="o_isg_num {{ veh.fuelCost &gt; 0 ? 'o_isg_c_blue' : '' }}"><t t-out="fmt(veh.fuelCost)"/></strong>
                                         </div>
                                         <div class="o_isg_fl_kpi">
-                                            <span>Net Profit</span>
-                                            <strong t-attf-class="o_isg_num {{ veh.net &gt; 0 ? 'o_isg_c_green' : (veh.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
-                                                <t t-if="veh.net &gt; 0">+</t><t t-out="fmt(veh.net)"/>
+                                            <span>Fuel Volume</span>
+                                            <strong class="o_isg_num"><t t-out="fmt(veh.fuelLiters)"/> <small>L</small></strong>
+                                        </div>
+                                        <div class="o_isg_fl_kpi">
+                                            <span>Efficiency</span>
+                                            <strong class="o_isg_num">
+                                                <t t-if="veh.avgLPer100Km &gt; 0"><t t-out="veh.avgLPer100Km"/> <small>L/100km</small></t>
+                                                <t t-else="">—</t>
                                             </strong>
                                         </div>
                                     </div>
 
-                                    <!-- Panel Tabs -->
+                                    <!-- Panel Tabs (Maintenance & Fuel first!) -->
                                     <div class="o_isg_adj_tabs o_isg_fl_tabs_bar">
                                         <div class="o_isg_fl_tabs_left">
-                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'travels' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('travels')">
-                                                Travels <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleTrips.length"/></span>
-                                            </button>
                                             <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'maintenance' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('maintenance')">
                                                 Maintenance <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleServices.length"/></span>
                                             </button>
+                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'fuel' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('fuel')">
+                                                Fuel <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleFuelLogs.length"/></span>
+                                            </button>
+                                            <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'travels' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('travels')">
+                                                Travels <span class="o_isg_tab_cnt o_isg_num"><t t-out="selectedVehicleTrips.length"/></span>
+                                            </button>
                                             <button type="button" t-attf-class="o_isg_adj_tab {{ state.fleetMgr.tab === 'pnl' ? 'active' : '' }}" t-on-click="() => this.setFleetTab('pnl')">
-                                                P&amp;L Summary
+                                                Summary
                                             </button>
                                         </div>
                                         <div class="o_isg_fl_tabs_actions">
-                                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.openNewTripForm()">
-                                                <i class="fa fa-plus me-1"/>Log Travel
+                                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.openNewFuelForm()">
+                                                <i class="fa fa-tint me-1"/>Log Fuel
                                             </button>
                                             <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openNewServiceForm()">
                                                 <i class="fa fa-wrench me-1"/>Log Maint.
                                             </button>
                                         </div>
                                     </div>
+
+                                    <!-- TAB: FUEL CONSUMPTION -->
+                                    <t t-if="state.fleetMgr.tab === 'fuel'">
+                                        <div class="o_isg_adj_body">
+                                            <!-- Inline Quick Log Fuel Form -->
+                                            <t t-if="state.fleetMgr.showNewFuel">
+                                                <div class="o_isg_fl_form">
+                                                    <div class="o_isg_fl_form_head">
+                                                        <strong><i class="fa fa-tint me-1 o_isg_c_blue"/>Log Fuel Refill for <t t-out="veh.plate"/></strong>
+                                                        <button type="button" class="o_isg_text_btn" t-on-click="() => { state.fleetMgr.showNewFuel = false; }">Cancel</button>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_3">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Liters Filled (L) *</span>
+                                                            <input type="number" min="0" step="0.5" class="o_isg_field o_isg_num"
+                                                                placeholder="e.g. 120"
+                                                                t-att-value="state.fleetMgr.fuelLiters"
+                                                                t-on-input="(ev) => this.onFuelLitersChange(ev.target.value)"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Price / Liter (<t t-out="state.currency"/>)</span>
+                                                            <input type="number" min="0" step="10" class="o_isg_field o_isg_num"
+                                                                placeholder="1650"
+                                                                t-att-value="state.fleetMgr.fuelPricePerLiter"
+                                                                t-on-input="(ev) => this.onFuelPriceChange(ev.target.value)"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Total Cost (<t t-out="state.currency"/>) *</span>
+                                                            <input type="number" min="0" step="1000" class="o_isg_field o_isg_num"
+                                                                placeholder="Auto-calculated"
+                                                                t-att-value="state.fleetMgr.fuelAmount"
+                                                                t-on-input="(ev) => this.onFuelAmountChange(ev.target.value)"/>
+                                                        </label>
+                                                    </div>
+                                                    <div class="o_isg_fl_grid_3">
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Date</span>
+                                                            <input type="date" class="o_isg_field o_isg_num"
+                                                                t-att-value="state.fleetMgr.fuelDate"
+                                                                t-on-input="(ev) => { state.fleetMgr.fuelDate = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Odometer (<t t-out="veh.odometerUnit"/>)</span>
+                                                            <input type="number" min="0" step="1" class="o_isg_field o_isg_num"
+                                                                placeholder="Current km"
+                                                                t-att-value="state.fleetMgr.fuelOdometer"
+                                                                t-on-input="(ev) => { state.fleetMgr.fuelOdometer = ev.target.value; }"/>
+                                                        </label>
+                                                        <label class="o_isg_fl_field_lbl">
+                                                            <span>Fuel Station <span class="o_isg_muted">(optional)</span></span>
+                                                            <input type="text" class="o_isg_field"
+                                                                placeholder="e.g. SP, Engen, Mount Meru"
+                                                                t-att-value="state.fleetMgr.fuelStation"
+                                                                t-on-input="(ev) => { state.fleetMgr.fuelStation = ev.target.value; }"/>
+                                                        </label>
+                                                    </div>
+                                                    <label class="o_isg_fl_field_lbl">
+                                                        <span>Notes / Receipt # <span class="o_isg_muted">(optional)</span></span>
+                                                        <input type="text" class="o_isg_field"
+                                                            placeholder="e.g. Full tank before Rubavu trip"
+                                                            t-att-value="state.fleetMgr.fuelNotes"
+                                                            t-on-input="(ev) => { state.fleetMgr.fuelNotes = ev.target.value; }"/>
+                                                    </label>
+                                                    <div class="o_isg_fl_form_foot">
+                                                        <div class="o_isg_muted small">
+                                                            Tip: Entering Odometer on consecutive fill-ups automatically computes <strong>L/100km</strong>.
+                                                        </div>
+                                                        <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs"
+                                                            t-att-disabled="state.fleetMgr.busy"
+                                                            t-on-click="() => this.saveQuickFuel()">
+                                                            <i t-attf-class="fa {{ state.fleetMgr.busy ? 'fa-spinner fa-spin' : 'fa-check' }} me-1"/>Save Fuel Refill
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </t>
+
+                                            <t t-if="selectedVehicleFuelLogs.length">
+                                                <div class="o_isg_fl_feed">
+                                                    <t t-foreach="selectedVehicleFuelLogs" t-as="fl" t-key="fl.id">
+                                                        <div class="o_isg_fl_card">
+                                                            <div class="o_isg_fl_card_top">
+                                                                <div class="o_isg_fl_card_meta">
+                                                                    <span class="o_isg_fuel_pill o_isg_num">
+                                                                        <i class="fa fa-tint me-1"/>
+                                                                        <t t-if="fl.liters &gt; 0"><t t-out="fmt(fl.liters)"/> L</t>
+                                                                        <t t-else="">Fuel Refill</t>
+                                                                    </span>
+                                                                    <span class="o_isg_muted small o_isg_num"><t t-out="fl.date"/></span>
+                                                                    <span t-if="fl.lPer100Km &gt; 0" class="o_isg_fuel_eff_badge o_isg_num">
+                                                                        <t t-out="fl.lPer100Km"/> L/100km
+                                                                    </span>
+                                                                </div>
+                                                                <div class="o_isg_fl_card_actions">
+                                                                    <strong class="o_isg_num o_isg_c_blue"><t t-out="fmt(fl.amount)"/> <small class="o_isg_muted"><t t-out="state.currency"/></small></strong>
+                                                                    <button t-if="fl.source === 'fuel_log'" type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('fleet.vehicle.log.services', fl.id)">Open</button>
+                                                                    <button t-else="" type="button" class="o_isg_text_btn" t-on-click="() => this.openRecord('isange.vehicle.trip', fl.recordId)">Trip</button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="o_isg_muted small o_isg_num">
+                                                                <t t-if="fl.pricePerLiter &gt; 0">@ <t t-out="fmt(fl.pricePerLiter)"/> <t t-out="state.currency"/>/L</t>
+                                                                <t t-if="fl.station"> · <t t-out="fl.station"/></t>
+                                                                <t t-if="fl.odometer &gt; 0"> · Odo <t t-out="fmt(fl.odometer)"/> <t t-out="veh.odometerUnit"/></t>
+                                                                <t t-if="fl.kmSincePrev &gt; 0"> (+<t t-out="fmt(fl.kmSincePrev)"/> km)</t>
+                                                                <t t-if="fl.notes"> · <t t-out="fl.notes"/></t>
+                                                            </div>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="o_isg_empty o_isg_empty_sm">
+                                                    <div>No fuel refills recorded yet for <t t-out="veh.plate"/> (<t t-out="fleetPeriodLabel"/>)</div>
+                                                    <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs mt-2" t-on-click="() => this.openNewFuelForm()">
+                                                        <i class="fa fa-tint me-1"/>Log First Fuel Refill
+                                                    </button>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
 
                                     <!-- TAB 1: TRAVELS -->
                                     <t t-if="state.fleetMgr.tab === 'travels'">
@@ -1523,7 +2041,7 @@
                         </div>
                     </div>
 
-                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.openOutstandingRent()" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openOutstandingRent())">
+                    <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.toggleRentManager(true, 'overdue')" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleRentManager(true, 'overdue'))">
                         <div class="o_isg_kpi_head">
                             <span class="o_isg_kpi_label">Rent Receivables</span>
                             <span t-attf-class="o_isg_kpi_badge {{ state.kpi.overdueCount ? 'is_alert' : '' }}">
@@ -1536,24 +2054,24 @@
                         </div>
                         <div class="o_isg_kpi_meta">
                             <span>Open tenant balances</span>
-                            <i class="fa fa-angle-right"/>
+                            <span class="o_isg_c_blue">Collect Rent →</span>
                         </div>
                     </div>
 
                     <div class="o_isg_kpi" role="button" tabindex="0" t-on-click="() => this.toggleFleetManager(true)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleFleetManager(true))">
                         <div class="o_isg_kpi_head">
-                            <span class="o_isg_kpi_label">Fleet Net Contribution</span>
-                            <span t-attf-class="o_isg_kpi_badge {{ state.kpi.fleetNet &lt; 0 ? 'is_alert' : '' }}">
-                                <t t-out="state.kpi.tripsMonth"/> trips
+                            <span class="o_isg_kpi_label">Fleet Maint. &amp; Fuel</span>
+                            <span class="o_isg_kpi_badge">
+                                <t t-out="state.fleetMgr.vehicles.length"/> trucks
                             </span>
                         </div>
-                        <div t-attf-class="o_isg_kpi_metric o_isg_num {{ state.kpi.fleetNet &lt; 0 ? 'is_negative' : '' }}">
-                            <t t-out="fmtShort(state.kpi.fleetNet)"/>
+                        <div class="o_isg_kpi_metric o_isg_num">
+                            <t t-out="fmtShort(state.kpi.maintMonth + state.kpi.fuelMonth)"/>
                             <span class="o_isg_kpi_curr"><t t-out="state.currency"/></span>
                         </div>
                         <div class="o_isg_kpi_meta">
-                            <span class="o_isg_num"><t t-out="fmt(state.kpi.distanceMonth)"/> km · Maint <t t-out="fmtShort(state.kpi.maintMonth)"/></span>
-                            <span class="o_isg_c_blue">Manage Fleet →</span>
+                            <span class="o_isg_num">Maint <t t-out="fmtShort(state.kpi.maintMonth)"/> · Fuel <t t-out="fmtShort(state.kpi.fuelMonth)"/></span>
+                            <span class="o_isg_c_blue">Log Maint / Fuel →</span>
                         </div>
                     </div>
                 </div>
@@ -1816,10 +2334,10 @@
                         <div class="o_isg_card_head">
                             <div>
                                 <div class="o_isg_card_title">Open Rent Receivables</div>
-                                <div class="o_isg_card_sub">Posted invoices awaiting tenant settlement</div>
+                                <div class="o_isg_card_sub">Click any tenant to record a 1-click rent payment</div>
                             </div>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.openOutstandingRent()">
-                                View All <i class="fa fa-angle-right ms-1"/>
+                            <button type="button" class="o_isg_btn o_isg_btn_cta o_isg_btn_xs" t-on-click="() => this.toggleRentManager(true, 'overdue')">
+                                Collect All (<t t-out="state.kpi.overdueCount"/>) <i class="fa fa-angle-right ms-1"/>
                             </button>
                         </div>
                         <t t-if="state.openInvoices.length">
@@ -1830,7 +2348,7 @@
                                     </thead>
                                     <tbody>
                                         <t t-foreach="state.openInvoices" t-as="inv" t-key="inv.id">
-                                            <tr tabindex="0" t-on-click="() => this.openRecord('account.move', inv.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.openRecord('account.move', inv.id))">
+                                            <tr tabindex="0" t-on-click="() => this.toggleRentManager(true, 'overdue', inv.id)" t-on-keydown="(ev) => this.onKeyActivate(ev, () => this.toggleRentManager(true, 'overdue', inv.id))">
                                                 <td class="o_isg_mono"><t t-out="inv.name"/></td>
                                                 <td>
                                                     <div class="o_isg_person">
@@ -1913,7 +2431,7 @@
                         <div class="o_isg_card_head">
                             <div>
                                 <div class="o_isg_card_title">Fleet Roster</div>
-                                <div class="o_isg_card_sub">Income, maintenance &amp; travels per vehicle</div>
+                                <div class="o_isg_card_sub">Maintenance, fuel &amp; operating cost per truck</div>
                             </div>
                             <button type="button" class="o_isg_btn o_isg_btn_sec o_isg_btn_xs" t-on-click="() => this.toggleFleetManager(true)">
                                 Manage <i class="fa fa-angle-right ms-1"/>
@@ -1931,14 +2449,14 @@
                                             </div>
                                             <div class="o_isg_person_name"><t t-out="v.name"/></div>
                                             <div class="o_isg_muted small o_isg_num">
-                                                Inc <t t-out="fmtShort(v.income)"/> · Maint <t t-out="fmtShort(v.maintenance)"/> · <t t-out="v.tripsCount"/> trips
+                                                Maint <t t-out="fmtShort(v.maintenance)"/> · Fuel <t t-out="fmtShort(v.fuelCost)"/> (<t t-out="fmt(v.fuelLiters)"/> L)
                                             </div>
                                         </div>
                                         <div class="o_isg_vehicle_odo o_isg_num">
-                                            <div t-attf-class="fw-semibold {{ v.net &gt; 0 ? 'o_isg_c_green' : (v.net &lt; 0 ? 'o_isg_c_rose' : '') }}">
-                                                <t t-if="v.net &gt; 0">+</t><t t-out="fmtShort(v.net)"/>
+                                            <div class="fw-semibold">
+                                                <t t-out="fmtShort(v.totalOpCost)"/>
                                             </div>
-                                            <div class="o_isg_muted small">net</div>
+                                            <div class="o_isg_muted small">op cost</div>
                                         </div>
                                     </div>
                                 </t>

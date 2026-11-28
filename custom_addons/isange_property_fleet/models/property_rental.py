@@ -119,29 +119,69 @@ class IsangeProperty(models.Model):
 
         date_domain = [('date_order', '>=', six_start_utc)] if six_start_utc else []
 
+        units = _safe_search_read(
+            'isange.property',
+            [('property_type', '!=', 'house')],
+            ['name', 'code', 'neighborhood', 'state', 'monthly_rent', 'current_tenant_id',
+             'net_profit', 'area_sqm', 'property_type', 'currency_id', 'notes'],
+            order='code asc',
+        )
+        leases = _safe_search_read(
+            'isange.lease',
+            [('state', '=', 'active')],
+            ['name', 'property_id', 'tenant_id', 'rent_amount', 'next_invoice_date',
+             'billing_cycle', 'currency_id'],
+            order='next_invoice_date asc',
+        )
+        rent_invoices = _safe_search_read(
+            'account.move',
+            [('isange_property_id', '!=', False), ('move_type', '=', 'out_invoice'), ('state', '=', 'posted')],
+            ['name', 'partner_id', 'amount_total_signed', 'amount_residual_signed',
+             'invoice_date', 'invoice_date_due', 'payment_state', 'isange_property_id',
+             'isange_lease_id', 'ref', 'invoice_origin', 'currency_id'],
+            order='invoice_date desc, id desc',
+        )
+        vehicles = _safe_search_read(
+            'fleet.vehicle',
+            [],
+            ['name', 'license_plate', 'driver_id', 'odometer', 'odometer_unit',
+             'model_id', 'state_id', 'fuel_type', 'description'],
+            order='id asc',
+            limit=50,
+        )
+
+        # Collect phone numbers for every tenant & driver referenced above in 1 lightweight query
+        phone_partner_ids = set()
+        for row in units:
+            if isinstance(row.get('current_tenant_id'), (list, tuple)):
+                phone_partner_ids.add(row['current_tenant_id'][0])
+        for row in leases:
+            if isinstance(row.get('tenant_id'), (list, tuple)):
+                phone_partner_ids.add(row['tenant_id'][0])
+        for row in rent_invoices:
+            if isinstance(row.get('partner_id'), (list, tuple)):
+                phone_partner_ids.add(row['partner_id'][0])
+        for row in vehicles:
+            if isinstance(row.get('driver_id'), (list, tuple)):
+                phone_partner_ids.add(row['driver_id'][0])
+
+        partner_phones = {}
+        if phone_partner_ids:
+            phone_rows = _safe_search_read(
+                'res.partner',
+                [('id', 'in', list(phone_partner_ids))],
+                ['id', 'phone'],
+            )
+            for pr in phone_rows:
+                if pr.get('phone'):
+                    partner_phones[str(pr['id'])] = pr['phone']
+
         return {
             'currencyInfo': self.get_dashboard_currency_info(),
-            'units': _safe_search_read(
-                'isange.property',
-                [('property_type', '!=', 'house')],
-                ['name', 'code', 'neighborhood', 'state', 'monthly_rent', 'current_tenant_id',
-                 'net_profit', 'area_sqm', 'property_type', 'currency_id'],
-                order='code asc',
-            ),
-            'leases': _safe_search_read(
-                'isange.lease',
-                [('state', '=', 'active')],
-                ['name', 'property_id', 'tenant_id', 'rent_amount', 'next_invoice_date',
-                 'billing_cycle', 'currency_id'],
-                order='next_invoice_date asc',
-            ),
-            'rentInvoices': _safe_search_read(
-                'account.move',
-                [('isange_property_id', '!=', False), ('move_type', '=', 'out_invoice'), ('state', '=', 'posted')],
-                ['name', 'partner_id', 'amount_total_signed', 'amount_residual_signed',
-                 'invoice_date', 'invoice_date_due', 'payment_state', 'isange_property_id'],
-                order='invoice_date desc',
-            ),
+            'units': units,
+            'leases': leases,
+            'rentInvoices': rent_invoices,
+            'partnerPhones': partner_phones,
             'sales': _safe_search_read(
                 'sale.order',
                 [('state', 'in', ['sale', 'done'])] + date_domain,
@@ -168,14 +208,7 @@ class IsangeProperty(models.Model):
                 order='date desc, id desc',
                 limit=500,
             ),
-            'vehicles': _safe_search_read(
-                'fleet.vehicle',
-                [],
-                ['name', 'license_plate', 'driver_id', 'odometer', 'odometer_unit',
-                 'model_id', 'state_id', 'fuel_type'],
-                order='id asc',
-                limit=50,
-            ),
+            'vehicles': vehicles,
             'fleetServices': _safe_search_read(
                 'fleet.vehicle.log.services',
                 [],
@@ -456,6 +489,236 @@ class IsangeProperty(models.Model):
             quant.with_context(**ctx).action_apply_inventory()
 
         return {'ok': True, 'product_id': product_id}
+
+    @api.model
+    def execute_rent_payment(self, payload):
+        """Record a full or partial tenant rent payment in ONE atomic RPC using
+        Odoo's native account.payment.register (Cash / MTN MoMo / Bank)."""
+        invoice_id = int(payload.get('invoice_id') or 0)
+        if not invoice_id:
+            raise UserError(_('Select a rent invoice first.'))
+        invoice = self.env['account.move'].browse(invoice_id)
+        if not invoice.exists() or invoice.state != 'posted':
+            raise UserError(_('This rent invoice is not posted.'))
+
+        before_residual = float(invoice.amount_residual or 0.0)
+        if before_residual <= 0.01:
+            return {
+                'ok': True,
+                'invoice_id': invoice.id,
+                'invoice_name': invoice.name,
+                'paid_amount': 0.0,
+                'residual': 0.0,
+                'payment_state': invoice.payment_state,
+            }
+
+        req_amount = float(payload.get('amount') or before_residual)
+        if req_amount <= 0:
+            raise UserError(_('Enter a payment amount greater than 0.'))
+        pay_amount = min(req_amount, before_residual)
+        payment_date = payload.get('payment_date') or fields.Date.context_today(self)
+        memo = (payload.get('communication') or '').strip() or invoice.name
+
+        journal_id = int(payload.get('journal_id') or 0)
+        if not journal_id:
+            j = self.env['account.journal'].search([('type', 'in', ['cash', 'bank'])], limit=1)
+            journal_id = j.id if j else False
+        if not journal_id:
+            raise UserError(_('No Cash or Bank journal is configured to record payments.'))
+
+        # Detect imported partial opening invoices (where prior payment had no partial reconcile row yet)
+        recv_lines = invoice.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable')
+        prior_paid = max(0.0, float(invoice.amount_total or 0.0) - before_residual)
+        had_unreconciled_prior = bool(prior_paid > 0.5 and recv_lines and not recv_lines.matched_credit_ids)
+        expected_residual = max(0.0, before_residual - pay_amount)
+
+        pay_ctx = {'active_model': 'account.move', 'active_ids': [invoice.id]}
+        wiz_vals = {
+            'journal_id': journal_id,
+            'amount': pay_amount,
+            'payment_date': payment_date,
+            'communication': memo,
+        }
+        if pay_amount < before_residual - 0.5:
+            wiz_vals['payment_difference_handling'] = 'open'
+        wiz = self.env['account.payment.register'].with_context(**pay_ctx).create(wiz_vals)
+        wiz.with_context(**pay_ctx).action_create_payments()
+
+        # Reconcile any pre-existing imported partial balance so double-entry residual matches expected_residual
+        invoice.invalidate_recordset(['amount_residual', 'payment_state'])
+        if had_unreconciled_prior and float(invoice.amount_residual or 0.0) > expected_residual + 0.5:
+            gap = float(invoice.amount_residual or 0.0) - expected_residual
+            cash_j = self.env['account.journal'].search([('type', '=', 'cash')], limit=1)
+            prior_wiz_vals = {
+                'journal_id': cash_j.id if cash_j else journal_id,
+                'amount': gap,
+                'payment_date': invoice.invoice_date or payment_date,
+                'communication': f"{invoice.name} (Prior partial settlement)",
+            }
+            if expected_residual > 0.5:
+                prior_wiz_vals['payment_difference_handling'] = 'open'
+            prior_wiz = self.env['account.payment.register'].with_context(**pay_ctx).create(prior_wiz_vals)
+            prior_wiz.with_context(**pay_ctx).action_create_payments()
+            invoice.invalidate_recordset(['amount_residual', 'payment_state'])
+
+        return {
+            'ok': True,
+            'invoice_id': invoice.id,
+            'invoice_name': invoice.name,
+            'paid_amount': pay_amount,
+            'residual': float(invoice.amount_residual or 0.0),
+            'payment_state': invoice.payment_state,
+        }
+
+    @api.model
+    def execute_bill_lease_rent(self, lease_id):
+        """Generate AND post the next rent invoice for an active lease in 1 click."""
+        lease = self.env['isange.lease'].browse(int(lease_id or 0))
+        if not lease.exists() or lease.state != 'active':
+            raise UserError(_('Select an active tenant lease to bill.'))
+        if lease.rent_amount <= 0:
+            raise UserError(_('Lease rent amount must be positive.'))
+
+        period_date = lease.next_invoice_date or fields.Date.context_today(self)
+        cycle_label = dict(lease._fields['billing_cycle'].selection).get(lease.billing_cycle, 'Monthly')
+        description = _('Rent for %s (%s - Due %s)') % (
+            lease.property_id.name,
+            cycle_label,
+            period_date,
+        )
+        invoice = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': lease.tenant_id.id,
+            'currency_id': lease.currency_id.id,
+            'invoice_date': fields.Date.context_today(self),
+            'invoice_date_due': period_date,
+            'isange_lease_id': lease.id,
+            'isange_property_id': lease.property_id.id,
+            'invoice_origin': lease.name,
+            'invoice_line_ids': [(0, 0, {
+                'name': description,
+                'quantity': 1.0,
+                'price_unit': lease.rent_amount,
+            })],
+        })
+        invoice.action_post()
+
+        if lease.billing_cycle == 'monthly':
+            lease.next_invoice_date = period_date + relativedelta(months=1)
+        elif lease.billing_cycle == 'quarterly':
+            lease.next_invoice_date = period_date + relativedelta(months=3)
+        elif lease.billing_cycle == 'yearly':
+            lease.next_invoice_date = period_date + relativedelta(years=1)
+
+        return {
+            'ok': True,
+            'invoice_id': invoice.id,
+            'invoice_name': invoice.name,
+            'next_invoice_date': str(lease.next_invoice_date or ''),
+        }
+
+    @api.model
+    def execute_log_vehicle_fuel(self, payload):
+        """Log a vehicle fuel refill (liters, price/L, total cost, odometer, station)
+        in ONE atomic RPC into fleet.vehicle.log.services under 'Fuel Refill'."""
+        vehicle_id = int(payload.get('vehicle_id') or 0)
+        vehicle = self.env['fleet.vehicle'].browse(vehicle_id)
+        if not vehicle.exists():
+            raise UserError(_('Select a valid vehicle first.'))
+
+        liters = max(0.0, float(payload.get('liters') or 0.0))
+        price_per_l = max(0.0, float(payload.get('price_per_liter') or 0.0))
+        amount = max(0.0, float(payload.get('amount') or 0.0))
+        if amount <= 0 and liters > 0 and price_per_l > 0:
+            amount = round(liters * price_per_l)
+        if amount <= 0 and liters <= 0:
+            raise UserError(_('Enter fuel liters or total fuel cost greater than 0.'))
+        if price_per_l <= 0 and liters > 0 and amount > 0:
+            price_per_l = round(amount / liters, 1)
+        if liters <= 0 and price_per_l > 0 and amount > 0:
+            liters = round(amount / price_per_l, 2)
+
+        ServiceType = self.env['fleet.service.type']
+        fuel_type = ServiceType.search([('name', 'ilike', 'Fuel Refill')], limit=1)
+        if not fuel_type:
+            fuel_type = ServiceType.create({'name': 'Fuel Refill', 'category': 'service'})
+
+        odo = max(0.0, float(payload.get('odometer') or 0.0))
+        fuel_date = payload.get('date') or fields.Date.context_today(self)
+        station = (payload.get('station') or '').strip()
+        user_notes = (payload.get('notes') or '').strip()
+        vendor_id = int(payload.get('vendor_id') or 0)
+
+        parts = []
+        if liters > 0:
+            parts.append(f"{liters:.1f} L")
+        if price_per_l > 0:
+            parts.append(f"@ {int(round(price_per_l)):,} RWF/L")
+        if station:
+            parts.append(f"— {station}")
+        desc = ' '.join(parts) or 'Fuel Refill'
+        tag = f"[FUEL|L={liters:.2f}|P={price_per_l:.1f}|S={station}]"
+        full_notes = f"{tag}\n{user_notes}" if user_notes else tag
+
+        svc = self.env['fleet.vehicle.log.services'].create({
+            'vehicle_id': vehicle.id,
+            'service_type_id': fuel_type.id,
+            'date': fuel_date,
+            'amount': amount,
+            'odometer': odo,
+            'vendor_id': vendor_id or False,
+            'purchaser_id': vehicle.driver_id.id or False,
+            'description': desc,
+            'notes': full_notes,
+            'state': 'done',
+        })
+        if odo > float(vehicle.odometer or 0.0):
+            try:
+                vehicle.write({'odometer': odo})
+            except Exception:
+                pass
+
+        return {
+            'ok': True,
+            'service_id': svc.id,
+            'vehicle_plate': vehicle.license_plate or vehicle.name,
+            'liters': liters,
+            'amount': amount,
+        }
+
+    @api.model
+    def execute_log_vehicle_maintenance(self, payload):
+        """Log a vehicle maintenance / repair record + update odometer in ONE RPC."""
+        vehicle_id = int(payload.get('vehicle_id') or 0)
+        vehicle = self.env['fleet.vehicle'].browse(vehicle_id)
+        if not vehicle.exists():
+            raise UserError(_('Select a valid vehicle first.'))
+        service_type_id = int(payload.get('service_type_id') or 0)
+        if not service_type_id:
+            raise UserError(_('Select a maintenance category first.'))
+        amount = max(0.0, float(payload.get('amount') or 0.0))
+        if amount <= 0:
+            raise UserError(_('Enter a maintenance cost greater than 0.'))
+
+        odo = max(0.0, float(payload.get('odometer') or 0.0))
+        svc = self.env['fleet.vehicle.log.services'].create({
+            'vehicle_id': vehicle.id,
+            'service_type_id': service_type_id,
+            'date': payload.get('date') or fields.Date.context_today(self),
+            'amount': amount,
+            'odometer': odo,
+            'vendor_id': int(payload.get('vendor_id') or 0) or False,
+            'purchaser_id': vehicle.driver_id.id or False,
+            'description': (payload.get('description') or '').strip() or False,
+            'notes': (payload.get('notes') or '').strip() or False,
+            'state': payload.get('state') or 'done',
+        })
+        if odo > float(vehicle.odometer or 0.0):
+            try:
+                vehicle.write({'odometer': odo})
+            except Exception:
+                pass
+        return {'ok': True, 'service_id': svc.id}
 
     def action_new_lease(self):
         """One-click button on a house to create a new Tenant Lease."""

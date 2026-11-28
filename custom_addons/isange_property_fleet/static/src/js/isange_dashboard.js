@@ -113,6 +113,37 @@ function localMonthKey(value) {
     return dt ? dt.toFormat("yyyy-MM") : "";
 }
 
+function isFuelServiceName(name) {
+    return String(name || "").toLowerCase().includes("fuel");
+}
+
+function parseFuelMeta(svc) {
+    const notes = String(svc.notes || "");
+    const desc = String(svc.description || "");
+    let liters = 0;
+    let pricePerLiter = 0;
+    let station = "";
+    let cleanNotes = notes;
+
+    const tagMatch = notes.match(/\[FUEL\|L=([\d.]+)\|P=([\d.]+)(?:\|S=([^\]]*))?\]/);
+    if (tagMatch) {
+        liters = parseFloat(tagMatch[1]) || 0;
+        pricePerLiter = parseFloat(tagMatch[2]) || 0;
+        station = (tagMatch[3] || "").trim();
+        cleanNotes = notes.replace(tagMatch[0], "").trim();
+    } else {
+        const lMatch = desc.match(/([\d.]+)\s*L\b/i);
+        if (lMatch) {
+            liters = parseFloat(lMatch[1]) || 0;
+        }
+        const pMatch = desc.match(/@\s*([\d,]+(?:\.\d+)?)/);
+        if (pMatch) {
+            pricePerLiter = parseFloat(pMatch[1].replace(/,/g, "")) || 0;
+        }
+    }
+    return { liters, pricePerLiter, station, cleanNotes };
+}
+
 /**
  * Ranking used to stack floors from top (highest) to bottom (lowest).
  * Unrecognised floor names are grouped at the bottom, just above "Unassigned".
@@ -163,6 +194,11 @@ export class IsangeDashboard extends Component {
             this.props.action &&
                 ((this.props.action.context && this.props.action.context.open_fleet_manager) ||
                     this.props.action.tag === "isange_fleet_manager")
+        );
+        const autoOpenRent = Boolean(
+            this.props.action &&
+                ((this.props.action.context && this.props.action.context.open_rent_manager) ||
+                    this.props.action.tag === "isange_rent_manager")
         );
         this.state = useState({
             loading: true,
@@ -269,6 +305,23 @@ export class IsangeDashboard extends Component {
                 lowCount: 0,
                 outCount: 0,
             },
+            // ---------------- Rent Collection & Overdue Manager State ----------------
+            rentMgr: {
+                open: autoOpenRent,
+                busy: false,
+                filter: "overdue", // 'overdue' | 'unpaid' | 'paid' | 'all'
+                site: "all",
+                search: "",
+                selectedId: false,
+                invoices: [],
+                leases: [],
+                sites: [],
+                payAmount: "",
+                payMethod: "momo", // 'momo' | 'cash' | 'bank'
+                payDate: "",
+                payNote: "",
+                lastReceipt: null,
+            },
             // ---------------- Vehicle & Fleet Management State ----------------
             fleetMgr: {
                 open: autoOpenFleet,
@@ -278,12 +331,22 @@ export class IsangeDashboard extends Component {
                 sixStartKey: "",
                 search: "",
                 selectedId: false,
-                tab: "travels", // 'travels' | 'maintenance' | 'pnl'
+                tab: "maintenance", // 'maintenance' | 'fuel' | 'travels' | 'pnl'
                 vehicles: [],
                 trips: [],
                 services: [],
+                fuelLogs: [],
                 serviceTypes: [],
                 drivers: [],
+                // Inline Log Fuel form
+                showNewFuel: false,
+                fuelDate: "",
+                fuelLiters: "",
+                fuelPricePerLiter: "1650",
+                fuelAmount: "",
+                fuelOdometer: "",
+                fuelStation: "",
+                fuelNotes: "",
                 // Inline Log Travel form
                 showNewTrip: false,
                 tripType: "delivery",
@@ -631,6 +694,7 @@ export class IsangeDashboard extends Component {
         const units = raw.units || [];
         const leases = raw.leases || [];
         const rentInvoices = raw.rentInvoices || [];
+        const partnerPhones = raw.partnerPhones || {};
         const sales = raw.sales || [];
         const posOrders = raw.posOrders || [];
         const purchases = raw.purchases || [];
@@ -733,33 +797,114 @@ export class IsangeDashboard extends Component {
         }
         const floors = Object.values(floorsMap).sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name));
 
+        const unitById = {};
+        for (const unit of units) {
+            unitById[unit.id] = unit;
+        }
+        const leaseById = {};
+        const leaseByPropId = {};
+        for (const lease of leases) {
+            leaseById[lease.id] = lease;
+            const pid = m2oId(lease.property_id);
+            if (pid && !leaseByPropId[pid]) {
+                leaseByPropId[pid] = lease;
+            }
+        }
+        const todayDt = DateTime.fromISO(todayStr);
+
         let outstandingRent = 0;
         let overdueCount = 0;
         const openInvoices = [];
+        const allRentInvoices = [];
+        const siteMap = {};
         for (const inv of rentInvoices) {
             const total = Math.abs(inv.amount_total_signed || 0);
             const residual = Math.abs(inv.amount_residual_signed || 0);
+            const paid = Math.max(0, total - residual);
             addToMonth(String(inv.invoice_date || "").slice(0, 7), "rent", total);
-            const isOpen = residual > 0 && !["paid", "in_payment", "reversed"].includes(inv.payment_state);
+            const isOpen = residual > 0.5 && !["paid", "in_payment", "reversed"].includes(inv.payment_state);
+            const overdue = isOpen && !!inv.invoice_date_due && inv.invoice_date_due < todayStr;
+            let daysOverdue = 0;
+            if (overdue && inv.invoice_date_due) {
+                const dueDt = DateTime.fromISO(inv.invoice_date_due);
+                if (dueDt.isValid) {
+                    daysOverdue = Math.max(1, Math.floor(todayDt.diff(dueDt, "days").days));
+                }
+            }
+            const partnerId = m2oId(inv.partner_id);
+            const propId = m2oId(inv.isange_property_id);
+            const leaseId = m2oId(inv.isange_lease_id) || (leaseByPropId[propId] ? leaseByPropId[propId].id : false);
+            const leaseObj = leaseId ? leaseById[leaseId] : null;
+            const unitObj = propId ? unitById[propId] : null;
+            const site = ((unitObj && unitObj.neighborhood) || "").trim() || "OTHER";
+            const tenantName = m2oName(inv.partner_id) || "Tenant";
+            const phone = (partnerId && partnerPhones[String(partnerId)]) || "";
+
+            const row = {
+                id: inv.id,
+                name: inv.name,
+                partnerId,
+                tenant: tenantName,
+                initials: this.initials(tenantName),
+                phone,
+                unitId: propId,
+                unit: m2oName(inv.isange_property_id),
+                unitCode: (unitObj && unitObj.code) || "",
+                site,
+                leaseId,
+                nextBillingDate: (leaseObj && leaseObj.next_invoice_date) || "",
+                invoiceDate: inv.invoice_date || "",
+                due: inv.invoice_date_due || "",
+                total,
+                paid,
+                residual: isOpen ? residual : 0,
+                paymentState: inv.payment_state || "not_paid",
+                isOpen,
+                isPartial: isOpen && paid > 0.5,
+                isPaid: !isOpen,
+                overdue,
+                daysOverdue,
+            };
+            allRentInvoices.push(row);
+
+            if (!siteMap[site]) {
+                siteMap[site] = {
+                    name: site,
+                    totalBilled: 0,
+                    collected: 0,
+                    remaining: 0,
+                    overdueCount: 0,
+                    tenantCount: 0,
+                };
+            }
+            siteMap[site].totalBilled += total;
+            siteMap[site].collected += isOpen ? paid : total;
+            siteMap[site].remaining += isOpen ? residual : 0;
+            siteMap[site].tenantCount += 1;
+            if (overdue) {
+                siteMap[site].overdueCount += 1;
+            }
+
             if (isOpen) {
                 outstandingRent += residual;
-                const overdue = !!inv.invoice_date_due && inv.invoice_date_due < todayStr;
                 if (overdue) {
                     overdueCount += 1;
                 }
-                openInvoices.push({
-                    id: inv.id,
-                    name: inv.name,
-                    tenant: m2oName(inv.partner_id),
-                    initials: this.initials(m2oName(inv.partner_id)),
-                    unit: m2oName(inv.isange_property_id),
-                    due: inv.invoice_date_due || "",
-                    total,
-                    residual,
-                    overdue,
-                });
+                openInvoices.push(row);
             }
         }
+        // Sort overdue (most days overdue / highest balance) first, then unpaid, then paid
+        const rentSort = (a, b) =>
+            (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) ||
+            (b.isOpen ? 1 : 0) - (a.isOpen ? 1 : 0) ||
+            b.daysOverdue - a.daysOverdue ||
+            b.residual - a.residual ||
+            a.tenant.localeCompare(b.tenant);
+        allRentInvoices.sort(rentSort);
+        openInvoices.sort(rentSort);
+        const rentSites = Object.values(siteMap).sort(
+            (a, b) => b.remaining - a.remaining || b.totalBilled - a.totalBilled || a.name.localeCompare(b.name)
+        );
 
         const upcomingRent = [];
         for (const lease of leases) {
@@ -835,44 +980,117 @@ export class IsangeDashboard extends Component {
             };
         });
 
-        const normalizedServices = fleetServices.map((svc) => {
+        // Separate Maintenance records from Fuel Refill records cleanly
+        const normalizedServices = [];
+        const normalizedFuelLogs = [];
+        for (const svc of fleetServices) {
             const rawDate = svc.date || "";
             const monthKey = String(rawDate).slice(0, 7);
             const amount = conv(svc.amount, svc.currency_id);
-            if (svc.state !== "cancelled" && monthKey === monthKeyNow) {
-                maintMonth += amount;
+            const svcTypeName = m2oName(svc.service_type_id) || "Maintenance";
+            const isFuel = isFuelServiceName(svcTypeName);
+
+            if (isFuel) {
+                if (svc.state !== "cancelled" && monthKey === monthKeyNow) {
+                    fuelMonth += amount;
+                    costMonth += amount;
+                }
+                const meta = parseFuelMeta(svc);
+                normalizedFuelLogs.push({
+                    id: svc.id,
+                    source: "fuel_log",
+                    vehicleId: m2oId(svc.vehicle_id),
+                    vehicle: m2oName(svc.vehicle_id),
+                    date: rawDate,
+                    monthKey,
+                    amount,
+                    liters: meta.liters,
+                    pricePerLiter: meta.pricePerLiter || (meta.liters > 0 ? Math.round(amount / meta.liters) : 0),
+                    station: meta.station || m2oName(svc.vendor_id) || "",
+                    odometer: Number(svc.odometer) || 0,
+                    driver: m2oName(svc.purchaser_id),
+                    description: svc.description || "",
+                    notes: meta.cleanNotes,
+                    state: svc.state || "done",
+                    kmSincePrev: 0,
+                    lPer100Km: 0,
+                });
+            } else {
+                if (svc.state !== "cancelled" && monthKey === monthKeyNow) {
+                    maintMonth += amount;
+                }
+                normalizedServices.push({
+                    id: svc.id,
+                    vehicleId: m2oId(svc.vehicle_id),
+                    vehicle: m2oName(svc.vehicle_id),
+                    serviceTypeId: m2oId(svc.service_type_id),
+                    serviceType: svcTypeName,
+                    date: rawDate,
+                    monthKey,
+                    amount,
+                    odometer: Number(svc.odometer) || 0,
+                    vendor: m2oName(svc.vendor_id),
+                    driver: m2oName(svc.purchaser_id),
+                    description: svc.description || "",
+                    notes: svc.notes || "",
+                    invRef: svc.inv_ref || "",
+                    state: svc.state || "done",
+                    stateLabel: SERVICE_STATE_LABELS[svc.state] || svc.state || "Done",
+                });
             }
-            return {
-                id: svc.id,
-                vehicleId: m2oId(svc.vehicle_id),
-                vehicle: m2oName(svc.vehicle_id),
-                serviceTypeId: m2oId(svc.service_type_id),
-                serviceType: m2oName(svc.service_type_id) || "Maintenance",
-                date: rawDate,
-                monthKey,
-                amount,
-                odometer: Number(svc.odometer) || 0,
-                vendor: m2oName(svc.vendor_id),
-                driver: m2oName(svc.purchaser_id),
-                description: svc.description || "",
-                notes: svc.notes || "",
-                invRef: svc.inv_ref || "",
-                state: svc.state || "done",
-                stateLabel: SERVICE_STATE_LABELS[svc.state] || svc.state || "Done",
-            };
-        });
+        }
+
+        // Compute km-between-refills & L/100km per vehicle chronologically
+        const fuelByVeh = {};
+        for (const fl of normalizedFuelLogs) {
+            if (fl.state === "cancelled" || !fl.vehicleId) {
+                continue;
+            }
+            (fuelByVeh[fl.vehicleId] ||= []).push(fl);
+        }
+        for (const logs of Object.values(fuelByVeh)) {
+            logs.sort((a, b) => (a.date || "").localeCompare(b.date || "") || a.id - b.id);
+            let prevOdo = 0;
+            for (const fl of logs) {
+                if (fl.odometer > 0 && prevOdo > 0 && fl.odometer > prevOdo) {
+                    fl.kmSincePrev = fl.odometer - prevOdo;
+                    if (fl.liters > 0) {
+                        fl.lPer100Km = Math.round((fl.liters / fl.kmSincePrev) * 1000) / 10;
+                    }
+                }
+                if (fl.odometer > 0) {
+                    prevOdo = fl.odometer;
+                }
+            }
+        }
 
         const recentTrips = normalizedTrips.slice(0, 6);
 
         // Build per-vehicle lifetime summary for overview Fleet Roster cards
         const vehLifetime = {};
+        const initVehAgg = () => ({
+            income: 0,
+            tripCost: 0,
+            otherCost: 0,
+            maint: 0,
+            fuelCost: 0,
+            fuelLiters: 0,
+            fuelCount: 0,
+            maintCount: 0,
+            trips: 0,
+            km: 0,
+            active: 0,
+        });
         for (const t of normalizedTrips) {
             if (t.state === "cancelled" || !t.vehicleId) {
                 continue;
             }
-            const agg = (vehLifetime[t.vehicleId] ||= { income: 0, tripCost: 0, maint: 0, trips: 0, km: 0, active: 0 });
+            const agg = (vehLifetime[t.vehicleId] ||= initVehAgg());
             agg.income += t.fee;
             agg.tripCost += t.cost;
+            agg.otherCost += t.otherCost;
+            agg.fuelCost += t.fuelCost;
+            agg.fuelLiters += t.fuelLiters;
             agg.trips += 1;
             agg.km += t.distance;
             if (t.state === "in_transit") {
@@ -883,27 +1101,48 @@ export class IsangeDashboard extends Component {
             if (s.state === "cancelled" || !s.vehicleId) {
                 continue;
             }
-            const agg = (vehLifetime[s.vehicleId] ||= { income: 0, tripCost: 0, maint: 0, trips: 0, km: 0, active: 0 });
+            const agg = (vehLifetime[s.vehicleId] ||= initVehAgg());
             agg.maint += s.amount;
+            agg.maintCount += 1;
+        }
+        for (const fl of normalizedFuelLogs) {
+            if (fl.state === "cancelled" || !fl.vehicleId) {
+                continue;
+            }
+            const agg = (vehLifetime[fl.vehicleId] ||= initVehAgg());
+            agg.fuelCost += fl.amount;
+            agg.fuelLiters += fl.liters;
+            agg.fuelCount += 1;
+            if (fl.kmSincePrev > 0) {
+                agg.km += fl.kmSincePrev;
+            }
         }
 
         const vehicleCards = vehicles.map((v) => {
-            const agg = vehLifetime[v.id] || { income: 0, tripCost: 0, maint: 0, trips: 0, km: 0, active: 0 };
+            const agg = vehLifetime[v.id] || initVehAgg();
+            const driverId = m2oId(v.driver_id);
             return {
                 id: v.id,
                 name: m2oName(v.model_id) || v.name,
                 fullName: v.name,
                 plate: (v.license_plate || "—").toUpperCase(),
-                driver: m2oName(v.driver_id) || "No driver assigned",
+                driver: (m2oName(v.driver_id) || "No driver assigned").replace(/\s*\(Driver\)\s*$/i, ""),
+                driverPhone: (driverId && partnerPhones[String(driverId)]) || "",
+                description: v.description || "",
                 odometer: Number(v.odometer) || 0,
                 odometerUnit: v.odometer_unit === "miles" ? "mi" : "km",
-                driverId: m2oId(v.driver_id),
+                driverId,
                 stateName: m2oName(v.state_id) || "",
                 fuelType: v.fuel_type || "",
                 income: agg.income,
                 maintenance: agg.maint,
+                fuelCost: agg.fuelCost,
+                fuelLiters: Math.round(agg.fuelLiters * 10) / 10,
+                fuelCount: agg.fuelCount,
+                maintCount: agg.maintCount,
+                totalOpCost: agg.maint + agg.fuelCost,
                 tripCost: agg.tripCost,
-                net: agg.income - agg.tripCost - agg.maint,
+                net: agg.income - agg.maint - agg.fuelCost - agg.otherCost,
                 tripsCount: agg.trips,
                 distanceKm: agg.km,
                 activeTripsCount: agg.active,
@@ -1163,6 +1402,28 @@ export class IsangeDashboard extends Component {
         sm.lowCount = lowCount;
         sm.outCount = outCount;
 
+        // Hydrate Rent Collection & Overdue Manager state
+        const rm = this.state.rentMgr;
+        rm.invoices = allRentInvoices;
+        rm.leases = leases;
+        rm.sites = rentSites;
+        if (!rm.payDate) {
+            rm.payDate = todayStr;
+        }
+        if (rm.selectedId) {
+            const stillThere = allRentInvoices.find((inv) => inv.id === rm.selectedId);
+            if (!stillThere) {
+                rm.selectedId = false;
+            } else if (stillThere.residual > 0) {
+                rm.payAmount = String(Math.round(stillThere.residual));
+            }
+        }
+        if (!rm.selectedId && allRentInvoices.length) {
+            const firstOpen = allRentInvoices.find((inv) => inv.overdue) || allRentInvoices.find((inv) => inv.isOpen) || allRentInvoices[0];
+            rm.selectedId = firstOpen.id;
+            rm.payAmount = firstOpen.residual > 0 ? String(Math.round(firstOpen.residual)) : "";
+        }
+
         // Hydrate Vehicle & Fleet Manager state
         const fm = this.state.fleetMgr;
         fm.monthKeyNow = monthKeyNow;
@@ -1170,12 +1431,19 @@ export class IsangeDashboard extends Component {
         fm.vehicles = vehicleCards;
         fm.trips = normalizedTrips;
         fm.services = normalizedServices;
-        fm.serviceTypes = fleetServiceTypes.map((st) => ({ id: st.id, name: st.name }));
-        if (!fm.svcTypeId && fm.serviceTypes.length) {
-            fm.svcTypeId = fm.serviceTypes[0].id;
+        fm.fuelLogs = normalizedFuelLogs;
+        const maintTypes = fleetServiceTypes
+            .filter((st) => !isFuelServiceName(st.name))
+            .map((st) => ({ id: st.id, name: st.name }));
+        fm.serviceTypes = maintTypes;
+        if ((!fm.svcTypeId || !maintTypes.some((st) => st.id === fm.svcTypeId)) && maintTypes.length) {
+            fm.svcTypeId = maintTypes[0].id;
         }
         if (!fm.svcDate) {
             fm.svcDate = todayStr;
+        }
+        if (!fm.fuelDate) {
+            fm.fuelDate = todayStr;
         }
         // Build driver list: vehicle drivers first, then partners
         const driverMap = new Map();
@@ -1209,7 +1477,262 @@ export class IsangeDashboard extends Component {
     }
 
     // ------------------------------------------------------------------
-    // Vehicle & Fleet Management (Income, Maintenance & Travels)
+    // Rent Collection & Overdue Manager (All Tenants, 1-Click Payment)
+    // ------------------------------------------------------------------
+
+    toggleRentManager(forceOpen = null, filter = null, invoiceId = null) {
+        const rm = this.state.rentMgr;
+        const nextOpen = forceOpen !== null ? forceOpen : !rm.open;
+        rm.open = nextOpen;
+        if (nextOpen) {
+            this.state.fastSale.open = false;
+            this.state.stockMgr.open = false;
+            this.state.fleetMgr.open = false;
+            if (filter) {
+                rm.filter = filter;
+            }
+            if (invoiceId) {
+                const target = rm.invoices.find((inv) => inv.id === invoiceId);
+                if (target) {
+                    if (!target.overdue && rm.filter === "overdue") {
+                        rm.filter = target.isOpen ? "unpaid" : "all";
+                    }
+                    this.selectRentInvoice(target);
+                }
+            } else {
+                const list = this.filteredRentInvoices;
+                if (list.length && !list.some((inv) => inv.id === rm.selectedId)) {
+                    this.selectRentInvoice(list[0]);
+                }
+            }
+            const scroller = document.querySelector(".o_isange_dashboard");
+            if (scroller && scroller.scrollTop > 120) {
+                scroller.scrollTo({ top: 0, behavior: "smooth" });
+            }
+        }
+    }
+
+    selectRentInvoice(inv) {
+        const rm = this.state.rentMgr;
+        rm.selectedId = inv.id;
+        rm.payAmount = inv.residual > 0 ? String(Math.round(inv.residual)) : "";
+        rm.payDate = rm.payDate || DateTime.local().toISODate();
+        rm.payNote = "";
+    }
+
+    setRentFilter(filter) {
+        const rm = this.state.rentMgr;
+        rm.filter = filter;
+        const list = this.filteredRentInvoices;
+        if (list.length && !list.some((inv) => inv.id === rm.selectedId)) {
+            this.selectRentInvoice(list[0]);
+        }
+    }
+
+    setRentSite(site) {
+        const rm = this.state.rentMgr;
+        rm.site = site;
+        const list = this.filteredRentInvoices;
+        if (list.length && !list.some((inv) => inv.id === rm.selectedId)) {
+            this.selectRentInvoice(list[0]);
+        }
+    }
+
+    setRentPayMethod(method) {
+        this.state.rentMgr.payMethod = method;
+    }
+
+    setRentPayQuick(fraction) {
+        const inv = this.selectedRentInvoice;
+        if (!inv || inv.residual <= 0) {
+            return;
+        }
+        this.state.rentMgr.payAmount = String(Math.max(1, Math.round(inv.residual * fraction)));
+    }
+
+    get rentSummary() {
+        const invs = this.state.rentMgr.invoices || [];
+        let totalBilled = 0;
+        let totalCollected = 0;
+        let totalRemaining = 0;
+        let overdueAmount = 0;
+        let overdueCount = 0;
+        let unpaidCount = 0;
+        let paidCount = 0;
+        for (const inv of invs) {
+            totalBilled += inv.total;
+            totalCollected += inv.isOpen ? inv.paid : inv.total;
+            if (inv.isOpen) {
+                totalRemaining += inv.residual;
+                unpaidCount += 1;
+                if (inv.overdue) {
+                    overdueAmount += inv.residual;
+                    overdueCount += 1;
+                }
+            } else {
+                paidCount += 1;
+            }
+        }
+        const collectionPct = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
+        return {
+            totalBilled,
+            totalCollected,
+            totalRemaining,
+            overdueAmount,
+            overdueCount,
+            unpaidCount,
+            paidCount,
+            totalCount: invs.length,
+            collectionPct,
+        };
+    }
+
+    get filteredRentInvoices() {
+        const rm = this.state.rentMgr;
+        const q = (rm.search || "").trim().toLowerCase();
+        return (rm.invoices || []).filter((inv) => {
+            if (rm.filter === "overdue" && !(inv.isOpen && inv.overdue)) {
+                return false;
+            }
+            if (rm.filter === "unpaid" && !inv.isOpen) {
+                return false;
+            }
+            if (rm.filter === "paid" && inv.isOpen) {
+                return false;
+            }
+            if (rm.site !== "all" && inv.site !== rm.site) {
+                return false;
+            }
+            if (
+                q &&
+                !(inv.tenant || "").toLowerCase().includes(q) &&
+                !(inv.phone || "").toLowerCase().includes(q) &&
+                !(inv.unit || "").toLowerCase().includes(q) &&
+                !(inv.site || "").toLowerCase().includes(q) &&
+                !(inv.name || "").toLowerCase().includes(q)
+            ) {
+                return false;
+            }
+            return true;
+        });
+    }
+
+    get selectedRentInvoice() {
+        const list = this.filteredRentInvoices;
+        const id = this.state.rentMgr.selectedId;
+        if (id) {
+            const inList = list.find((inv) => inv.id === id);
+            if (inList) {
+                return inList;
+            }
+            const inAll = (this.state.rentMgr.invoices || []).find((inv) => inv.id === id);
+            if (inAll) {
+                return inAll;
+            }
+        }
+        return list[0] || (this.state.rentMgr.invoices || [])[0] || null;
+    }
+
+    get rentPayAmountNum() {
+        const val = parseFloat(this.state.rentMgr.payAmount);
+        return isNaN(val) || val <= 0 ? 0 : val;
+    }
+
+    get rentPayAfter() {
+        const inv = this.selectedRentInvoice;
+        if (!inv) {
+            return 0;
+        }
+        return Math.max(0, inv.residual - this.rentPayAmountNum);
+    }
+
+    async recordRentPayment() {
+        const rm = this.state.rentMgr;
+        const inv = this.selectedRentInvoice;
+        if (!inv || rm.busy) {
+            return;
+        }
+        if (!inv.isOpen || inv.residual <= 0) {
+            this.notification.add("This rent invoice is already fully paid.", { type: "info" });
+            return;
+        }
+        const amount = this.rentPayAmountNum;
+        if (amount <= 0) {
+            this.notification.add("Enter a rent payment amount greater than 0.", { type: "warning" });
+            return;
+        }
+        const method = rm.payMethod || "momo";
+        const journals = this.state.fastSale.journals || {};
+        const journalId = journals[method] || journals.momo || journals.cash || journals.bank || 0;
+        const methodLabel = method === "cash" ? "Cash" : method === "momo" ? "MTN MoMo" : "Bank Transfer";
+
+        rm.busy = true;
+        try {
+            const res = await this.orm.call("isange.property", "execute_rent_payment", [
+                {
+                    invoice_id: inv.id,
+                    amount,
+                    journal_id: journalId,
+                    payment_date: rm.payDate || DateTime.local().toISODate(),
+                    communication: (rm.payNote || "").trim() || `${inv.name} (${inv.tenant})`,
+                },
+            ]);
+            const paidAmt = (res && res.paid_amount) || Math.min(amount, inv.residual);
+            const remAmt = res && res.residual !== undefined ? res.residual : Math.max(0, inv.residual - paidAmt);
+            rm.lastReceipt = {
+                invId: inv.id,
+                invName: inv.name,
+                tenant: inv.tenant,
+                site: inv.site,
+                amount: paidAmt,
+                method: methodLabel,
+                residual: remAmt,
+                fullyPaid: remAmt <= 0.5,
+            };
+            rm.payNote = "";
+            await this.loadData();
+            this.notification.add(
+                `${inv.tenant} — ${this.fmt(paidAmt)} ${this.state.currency} recorded via ${methodLabel}${remAmt > 0.5 ? ` (Remaining ${this.fmt(remAmt)})` : " (Fully Settled)"}.`,
+                { title: "Rent Payment Recorded", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not record the rent payment. Please try again.", { type: "danger" });
+        } finally {
+            rm.busy = false;
+        }
+    }
+
+    async billNextMonthRent(leaseId) {
+        const rm = this.state.rentMgr;
+        if (!leaseId || rm.busy) {
+            return;
+        }
+        rm.busy = true;
+        try {
+            const res = await this.orm.call("isange.property", "execute_bill_lease_rent", [leaseId]);
+            await this.loadData();
+            if (res && res.invoice_id) {
+                rm.filter = "unpaid";
+                const created = rm.invoices.find((i) => i.id === res.invoice_id);
+                if (created) {
+                    this.selectRentInvoice(created);
+                }
+            }
+            this.notification.add(
+                `New rent invoice ${(res && res.invoice_name) || ""} posted! Next due date updated to ${(res && res.next_invoice_date) || ""}.`,
+                { title: "Next Month Billed", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not generate the next rent invoice.", { type: "danger" });
+        } finally {
+            rm.busy = false;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Vehicle & Fleet Management (Maintenance, Fuel Consumption & Travels)
     // ------------------------------------------------------------------
 
     toggleFleetManager(forceOpen = null, vehicleId = null) {
@@ -1219,6 +1742,7 @@ export class IsangeDashboard extends Component {
         if (nextOpen) {
             this.state.fastSale.open = false;
             this.state.stockMgr.open = false;
+            this.state.rentMgr.open = false;
             if (vehicleId) {
                 const target = fm.vehicles.find((v) => v.id === vehicleId);
                 if (target) {
@@ -1239,10 +1763,12 @@ export class IsangeDashboard extends Component {
         fm.selectedId = v.id;
         fm.showNewTrip = false;
         fm.showNewService = false;
+        fm.showNewFuel = false;
         fm.editOdo = String(v.odometer || 0);
         fm.tripDriverId = v.driverId || (fm.drivers[0] ? fm.drivers[0].id : false);
         fm.tripOdoStart = String(v.odometer || 0);
         fm.svcOdometer = String(v.odometer || 0);
+        fm.fuelOdometer = String(v.odometer || 0);
     }
 
     setFleetPeriod(period) {
@@ -1254,6 +1780,7 @@ export class IsangeDashboard extends Component {
         fm.tab = tab;
         fm.showNewTrip = false;
         fm.showNewService = false;
+        fm.showNewFuel = false;
     }
 
     get fleetPeriodLabel() {
@@ -1291,16 +1818,23 @@ export class IsangeDashboard extends Component {
                 otherCost: 0,
                 tripCost: 0,
                 totalCost: 0,
+                totalOpCost: 0,
                 net: 0,
                 tripsCount: 0,
                 activeTripsCount: 0,
                 distanceKm: 0,
+                trackedFuelKm: 0,
+                trackedFuelLiters: 0,
                 fuelLiters: 0,
+                fuelCount: 0,
                 servicesCount: 0,
+                avgLPer100Km: 0,
+                fuelCostPerKm: 0,
                 costPerKm: 0,
                 avgIncomePerTrip: 0,
                 lastTripDate: "",
                 lastServiceDate: "",
+                lastFuelDate: "",
                 incomeBarPct: 0,
                 maintBarPct: 0,
                 fuelBarPct: 0,
@@ -1322,6 +1856,13 @@ export class IsangeDashboard extends Component {
             agg.tripsCount += 1;
             agg.distanceKm += t.distance;
             agg.fuelLiters += t.fuelLiters;
+            if (t.fuelLiters > 0 || t.fuelCost > 0) {
+                agg.fuelCount += 1;
+            }
+            if (t.distance > 0 && t.fuelLiters > 0) {
+                agg.trackedFuelKm += t.distance;
+                agg.trackedFuelLiters += t.fuelLiters;
+            }
             if (t.state === "in_transit") {
                 agg.activeTripsCount += 1;
             }
@@ -1345,23 +1886,51 @@ export class IsangeDashboard extends Component {
             }
         }
 
+        for (const fl of fm.fuelLogs || []) {
+            if (fl.state === "cancelled" || !this._fleetInPeriod(fl.monthKey)) {
+                continue;
+            }
+            const agg = map.get(fl.vehicleId);
+            if (!agg) {
+                continue;
+            }
+            agg.fuelCost += fl.amount;
+            agg.fuelLiters += fl.liters;
+            agg.fuelCount += 1;
+            if (fl.kmSincePrev > 0) {
+                agg.distanceKm += fl.kmSincePrev;
+                if (fl.liters > 0) {
+                    agg.trackedFuelKm += fl.kmSincePrev;
+                    agg.trackedFuelLiters += fl.liters;
+                }
+            }
+            if (!agg.lastFuelDate && fl.date) {
+                agg.lastFuelDate = fl.date;
+            }
+        }
+
         const list = Array.from(map.values()).map((agg) => {
-            agg.totalCost = agg.maintenance + agg.tripCost;
+            agg.totalOpCost = agg.maintenance + agg.fuelCost;
+            agg.totalCost = agg.maintenance + agg.fuelCost + agg.otherCost;
             agg.net = agg.income - agg.totalCost;
+            agg.avgLPer100Km =
+                agg.trackedFuelKm > 0 && agg.trackedFuelLiters > 0
+                    ? Math.round((agg.trackedFuelLiters / agg.trackedFuelKm) * 1000) / 10
+                    : 0;
+            agg.fuelCostPerKm = agg.distanceKm > 0 ? Math.round(agg.fuelCost / agg.distanceKm) : 0;
             agg.costPerKm = agg.distanceKm > 0 ? Math.round(agg.totalCost / agg.distanceKm) : 0;
             agg.avgIncomePerTrip = agg.tripsCount > 0 ? Math.round(agg.income / agg.tripsCount) : 0;
-            const scale = Math.max(agg.income, agg.totalCost, 1);
+            const scale = Math.max(agg.totalOpCost, agg.income, 1);
             agg.incomeBarPct = Math.round((agg.income / scale) * 100);
             agg.maintBarPct = Math.round((agg.maintenance / scale) * 100);
-            agg.fuelBarPct = Math.round((agg.tripCost / scale) * 100);
+            agg.fuelBarPct = Math.round((agg.fuelCost / scale) * 100);
             return agg;
         });
 
         list.sort(
             (a, b) =>
-                b.activeTripsCount - a.activeTripsCount ||
-                b.income - a.income ||
-                b.tripsCount - a.tripsCount ||
+                b.totalOpCost - a.totalOpCost ||
+                b.servicesCount + b.fuelCount - (a.servicesCount + a.fuelCount) ||
                 a.plate.localeCompare(b.plate)
         );
         return list;
@@ -1377,7 +1946,8 @@ export class IsangeDashboard extends Component {
             (v) =>
                 (v.plate || "").toLowerCase().includes(q) ||
                 (v.name || "").toLowerCase().includes(q) ||
-                (v.driver || "").toLowerCase().includes(q)
+                (v.driver || "").toLowerCase().includes(q) ||
+                (v.driverPhone || "").toLowerCase().includes(q)
         );
     }
 
@@ -1390,7 +1960,10 @@ export class IsangeDashboard extends Component {
         let tripsCount = 0;
         let activeTripsCount = 0;
         let distanceKm = 0;
+        let trackedFuelKm = 0;
+        let trackedFuelLiters = 0;
         let fuelLiters = 0;
+        let fuelCount = 0;
         let servicesCount = 0;
 
         for (const v of this.fleetVehicleStats) {
@@ -1402,25 +1975,39 @@ export class IsangeDashboard extends Component {
             tripsCount += v.tripsCount;
             activeTripsCount += v.activeTripsCount;
             distanceKm += v.distanceKm;
+            trackedFuelKm += v.trackedFuelKm;
+            trackedFuelLiters += v.trackedFuelLiters;
             fuelLiters += v.fuelLiters;
+            fuelCount += v.fuelCount;
             servicesCount += v.servicesCount;
         }
-        const totalExpenses = maintenance + tripCost;
+        const totalOpCost = maintenance + fuelCost;
+        const totalExpenses = maintenance + fuelCost + otherCost;
         const net = income - totalExpenses;
         const marginPct = income > 0 ? Math.round((net / income) * 100) : 0;
+        const avgLPer100Km =
+            trackedFuelKm > 0 && trackedFuelLiters > 0
+                ? Math.round((trackedFuelLiters / trackedFuelKm) * 1000) / 10
+                : 0;
+        const fuelCostPerKm = distanceKm > 0 ? Math.round(fuelCost / distanceKm) : 0;
         return {
             income,
             maintenance,
             fuelCost,
             otherCost,
             tripCost,
+            totalOpCost,
             totalExpenses,
             net,
             marginPct,
             tripsCount,
             activeTripsCount,
             distanceKm,
-            fuelLiters,
+            trackedFuelKm,
+            fuelLiters: Math.round(fuelLiters * 10) / 10,
+            fuelCount,
+            avgLPer100Km,
+            fuelCostPerKm,
             servicesCount,
         };
     }
@@ -1452,6 +2039,36 @@ export class IsangeDashboard extends Component {
         return this.state.fleetMgr.services.filter(
             (s) => s.vehicleId === veh.id && this._fleetInPeriod(s.monthKey)
         );
+    }
+
+    get selectedVehicleFuelLogs() {
+        const veh = this.selectedFleetVehicle;
+        if (!veh) {
+            return [];
+        }
+        const direct = (this.state.fleetMgr.fuelLogs || []).filter(
+            (fl) => fl.vehicleId === veh.id && this._fleetInPeriod(fl.monthKey)
+        );
+        const fromTrips = this.state.fleetMgr.trips
+            .filter((t) => t.vehicleId === veh.id && this._fleetInPeriod(t.monthKey) && t.state !== "cancelled" && (t.fuelLiters > 0 || t.fuelCost > 0))
+            .map((t) => ({
+                id: `trip_${t.id}`,
+                recordId: t.id,
+                source: "trip",
+                vehicleId: t.vehicleId,
+                date: String(t.date || "").slice(0, 10),
+                amount: t.fuelCost,
+                liters: t.fuelLiters,
+                pricePerLiter: t.fuelLiters > 0 ? Math.round(t.fuelCost / t.fuelLiters) : 0,
+                station: t.destination ? `Trip → ${t.destination}` : t.name,
+                odometer: t.odometerEnd || t.odometerStart || 0,
+                driver: t.driver,
+                description: `${t.name} (${t.origin} → ${t.destination})`,
+                notes: t.notes || "",
+                kmSincePrev: t.distance || 0,
+                lPer100Km: t.distance > 0 && t.fuelLiters > 0 ? Math.round((t.fuelLiters / t.distance) * 1000) / 10 : 0,
+            }));
+        return [...direct, ...fromTrips].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     }
 
     get selectedVehicleMaintByType() {
@@ -1497,6 +2114,7 @@ export class IsangeDashboard extends Component {
         const veh = this.selectedFleetVehicle;
         fm.tab = "travels";
         fm.showNewService = false;
+        fm.showNewFuel = false;
         fm.showNewTrip = !fm.showNewTrip;
         if (fm.showNewTrip && veh) {
             fm.tripType = "delivery";
@@ -1619,11 +2237,105 @@ export class IsangeDashboard extends Component {
         }
     }
 
+    openNewFuelForm() {
+        const fm = this.state.fleetMgr;
+        const veh = this.selectedFleetVehicle;
+        fm.tab = "fuel";
+        fm.showNewTrip = false;
+        fm.showNewService = false;
+        fm.showNewFuel = !fm.showNewFuel;
+        if (fm.showNewFuel && veh) {
+            fm.fuelDate = DateTime.local().toISODate();
+            fm.fuelLiters = "";
+            fm.fuelPricePerLiter = fm.fuelPricePerLiter || "1650";
+            fm.fuelAmount = "";
+            fm.fuelOdometer = String(veh.odometer || 0);
+            fm.fuelStation = "";
+            fm.fuelNotes = "";
+        }
+    }
+
+    onFuelLitersChange(val) {
+        const fm = this.state.fleetMgr;
+        fm.fuelLiters = val;
+        const liters = parseFloat(val) || 0;
+        const price = parseFloat(fm.fuelPricePerLiter) || 0;
+        if (liters > 0 && price > 0) {
+            fm.fuelAmount = String(Math.round(liters * price));
+        }
+    }
+
+    onFuelPriceChange(val) {
+        const fm = this.state.fleetMgr;
+        fm.fuelPricePerLiter = val;
+        const liters = parseFloat(fm.fuelLiters) || 0;
+        const price = parseFloat(val) || 0;
+        if (liters > 0 && price > 0) {
+            fm.fuelAmount = String(Math.round(liters * price));
+        }
+    }
+
+    onFuelAmountChange(val) {
+        const fm = this.state.fleetMgr;
+        fm.fuelAmount = val;
+        const liters = parseFloat(fm.fuelLiters) || 0;
+        const amt = parseFloat(val) || 0;
+        if (liters > 0 && amt > 0) {
+            fm.fuelPricePerLiter = String(Math.round(amt / liters));
+        }
+    }
+
+    async saveQuickFuel() {
+        const fm = this.state.fleetMgr;
+        const veh = this.selectedFleetVehicle;
+        if (!veh || fm.busy) {
+            return;
+        }
+        const liters = Math.max(0, parseFloat(fm.fuelLiters) || 0);
+        const pricePerLiter = Math.max(0, parseFloat(fm.fuelPricePerLiter) || 0);
+        let amount = Math.max(0, parseFloat(fm.fuelAmount) || 0);
+        if (amount <= 0 && liters > 0 && pricePerLiter > 0) {
+            amount = Math.round(liters * pricePerLiter);
+        }
+        if (liters <= 0 && amount <= 0) {
+            this.notification.add("Enter fuel liters or total fuel cost first.", { type: "warning" });
+            return;
+        }
+        const odo = Math.max(0, parseFloat(fm.fuelOdometer) || 0);
+        fm.busy = true;
+        try {
+            await this.orm.call("isange.property", "execute_log_vehicle_fuel", [
+                {
+                    vehicle_id: veh.id,
+                    date: fm.fuelDate || DateTime.local().toISODate(),
+                    liters,
+                    price_per_liter: pricePerLiter,
+                    amount,
+                    odometer: odo,
+                    station: (fm.fuelStation || "").trim(),
+                    notes: (fm.fuelNotes || "").trim(),
+                },
+            ]);
+            fm.showNewFuel = false;
+            await this.loadData();
+            this.notification.add(
+                `${veh.plate} · ${liters > 0 ? `${liters} L` : "Fuel"} logged (${this.fmt(amount)} ${this.state.currency}).`,
+                { title: "Fuel Refill Recorded", type: "success" }
+            );
+        } catch (err) {
+            console.error(err);
+            this.notification.add("Could not log fuel refill. Check fields and try again.", { type: "danger" });
+        } finally {
+            fm.busy = false;
+        }
+    }
+
     openNewServiceForm() {
         const fm = this.state.fleetMgr;
         const veh = this.selectedFleetVehicle;
         fm.tab = "maintenance";
         fm.showNewTrip = false;
+        fm.showNewFuel = false;
         fm.showNewService = !fm.showNewService;
         if (fm.showNewService && veh) {
             fm.svcDate = DateTime.local().toISODate();
@@ -1667,21 +2379,41 @@ export class IsangeDashboard extends Component {
         const odo = Math.max(0, parseFloat(fm.svcOdometer) || 0);
         fm.busy = true;
         try {
-            const vals = {
+            const payload = {
                 vehicle_id: veh.id,
                 service_type_id: Number(fm.svcTypeId),
                 date: fm.svcDate || DateTime.local().toISODate(),
                 amount,
                 odometer: odo,
-                vendor_id: fm.svcVendorId ? Number(fm.svcVendorId) : false,
-                purchaser_id: veh.driverId || false,
-                description: (fm.svcDescription || "").trim() || false,
-                notes: (fm.svcNotes || "").trim() || false,
+                vendor_id: fm.svcVendorId ? Number(fm.svcVendorId) : 0,
+                description: (fm.svcDescription || "").trim(),
+                notes: (fm.svcNotes || "").trim(),
                 state: fm.svcState || "done",
             };
-            await this.orm.create("fleet.vehicle.log.services", [vals]);
-            if (odo > (veh.odometer || 0)) {
-                await this.safe(this.orm.write("fleet.vehicle", [veh.id], { odometer: odo }), null);
+            try {
+                await this.orm.call("isange.property", "execute_log_vehicle_maintenance", [payload]);
+            } catch (fastErr) {
+                if (String((fastErr && fastErr.message) || "").includes("execute_log_vehicle_maintenance")) {
+                    await this.orm.create("fleet.vehicle.log.services", [
+                        {
+                            vehicle_id: veh.id,
+                            service_type_id: Number(fm.svcTypeId),
+                            date: payload.date,
+                            amount,
+                            odometer: odo,
+                            vendor_id: payload.vendor_id || false,
+                            purchaser_id: veh.driverId || false,
+                            description: payload.description || false,
+                            notes: payload.notes || false,
+                            state: payload.state,
+                        },
+                    ]);
+                    if (odo > (veh.odometer || 0)) {
+                        await this.safe(this.orm.write("fleet.vehicle", [veh.id], { odometer: odo }), null);
+                    }
+                } else {
+                    throw fastErr;
+                }
             }
             fm.showNewService = false;
             await this.loadData();
@@ -1763,6 +2495,7 @@ export class IsangeDashboard extends Component {
         if (nextOpen) {
             this.state.fastSale.open = false;
             this.state.fleetMgr.open = false;
+            this.state.rentMgr.open = false;
         }
     }
 
@@ -2167,6 +2900,7 @@ export class IsangeDashboard extends Component {
         if (nextOpen) {
             this.state.stockMgr.open = false;
             this.state.fleetMgr.open = false;
+            this.state.rentMgr.open = false;
         }
     }
 

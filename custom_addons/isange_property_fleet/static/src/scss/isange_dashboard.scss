@@ -2679,7 +2679,117 @@
     .o_isg_fl_ratio_fuel {
         height: 100%;
         border-radius: 999px;
-        background: var(--isg-text-faint);
+        background: var(--isg-blue);
+    }
+
+    // Rent Collection & Overdue Manager + Fuel Consumption Enhancements
+    .o_isg_ind_rose {
+        background: var(--isg-rose);
+        box-shadow: 0 0 0 3px var(--isg-rose-tint);
+    }
+
+    .o_isg_rent_sites_bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--isg-border);
+        background: var(--isg-surface-subtle);
+    }
+
+    .o_isg_rent_site_chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--isg-border);
+        background: var(--isg-surface);
+        color: var(--isg-text);
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.12s ease;
+
+        &:hover {
+            border-color: var(--isg-blue);
+            background: var(--isg-surface-hover);
+        }
+
+        &.active {
+            border-color: var(--isg-blue);
+            background: var(--isg-blue-tint);
+            color: var(--isg-blue);
+        }
+
+        strong, small {
+            font-size: 10.5px;
+            font-weight: 700;
+        }
+    }
+
+    .o_isg_rent_row_foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 7px;
+        padding-top: 6px;
+        border-top: 1px solid var(--isg-border-soft);
+    }
+
+    .o_isg_rent_head_avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 13.5px;
+    }
+
+    .o_isg_rent_kpis_3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border-bottom: 1px solid var(--isg-border);
+        background: var(--isg-surface);
+    }
+
+    .o_isg_rent_method_grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .o_isg_phone_link {
+        color: var(--isg-blue);
+        text-decoration: none;
+        font-weight: 600;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    .o_isg_fuel_pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--isg-blue-tint);
+        color: var(--isg-blue);
+        font-size: 11.5px;
+        font-weight: 700;
+    }
+
+    .o_isg_fuel_eff_badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: var(--isg-surface-subtle);
+        border: 1px solid var(--isg-border);
+        color: var(--isg-text-strong);
+        font-size: 11px;
+        font-weight: 650;
     }
 
     // Selected Vehicle Right Panel

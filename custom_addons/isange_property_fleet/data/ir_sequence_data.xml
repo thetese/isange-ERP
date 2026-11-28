@@ -69,6 +69,10 @@
             <field name="name">General Garage Repair</field>
             <field name="category">service</field>
         </record>
+        <record id="fleet_svc_fuel_refill" model="fleet.service.type">
+            <field name="name">Fuel Refill</field>
+            <field name="category">service</field>
+        </record>
     </data>
 
     <!-- Starter Business Data, Official Company Details, Bank Accounts & Commercial Units -->
