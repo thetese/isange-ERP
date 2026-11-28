@@ -689,6 +689,35 @@ def application(environ: dict, start_response):
     if path in ('/api/init-db', '/_vercel_odoo/init-db'):
         return _handle_init_db(environ, start_response)
 
+    # Replace Odoo's PWA Service Worker with a self-cleaning uninstaller on Vercel.
+    # Odoo's default SW caches /odoo HTML and traps users on "You are offline"
+    # whenever a serverless cold start or deployment cutover resets a navigation fetch.
+    if path == '/web/service-worker.js':
+        sw_body = (
+            b'// Self-cleaning Service Worker for Vercel Serverless Odoo\n'
+            b'self.addEventListener("install", () => { self.skipWaiting(); });\n'
+            b'self.addEventListener("activate", (event) => {\n'
+            b'    event.waitUntil((\n'
+            b'        async () => {\n'
+            b'            const keys = await caches.keys();\n'
+            b'            await Promise.all(keys.map((k) => caches.delete(k)));\n'
+            b'            await self.registration.unregister();\n'
+            b'            const clients = await self.clients.matchAll({ type: "window" });\n'
+            b'            for (const c of clients) { try { c.navigate(c.url); } catch (_) {} }\n'
+            b'        }\n'
+            b'    )());\n'
+            b'});\n'
+        )
+        headers = [
+            ('Content-Type', 'application/javascript; charset=utf-8'),
+            ('Content-Length', str(len(sw_body))),
+            ('Service-Worker-Allowed', '/odoo'),
+            ('Cache-Control', 'no-store, max-age=0, must-revalidate'),
+            ('CDN-Cache-Control', 'no-store'),
+        ]
+        start_response('200 OK', headers)
+        return [sw_body]
+
     # Vercel Functions do not support persistent WebSockets (`addons/bus`).
     # Respond cleanly so the Odoo frontend backs off instead of triggering 500s.
     if path == '/websocket':
