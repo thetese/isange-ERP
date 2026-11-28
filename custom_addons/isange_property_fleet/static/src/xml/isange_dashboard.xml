@@ -72,26 +72,19 @@
                             </span>
                         </button>
 
-                        <div class="o_isg_toolbar_group">
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.openPos()" title="Open Point of Sale">
-                                <i class="fa fa-desktop me-1"/>POS
-                            </button>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newPurchase()" title="Create Purchase Order">
-                                <i class="fa fa-cube me-1"/>Purchase
-                            </button>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newLease()" title="Create Commercial Lease">
-                                <i class="fa fa-file-text-o me-1"/>New Lease
-                            </button>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newUnit()" title="Add Building Unit">
-                                <i class="fa fa-building-o me-1"/>Add Unit
-                            </button>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newTrip()" title="Dispatch Delivery Vehicle">
-                                <i class="fa fa-truck me-1"/>Dispatch
-                            </button>
-                            <button type="button" class="o_isg_btn o_isg_btn_sec" t-on-click="() => this.newExpense()" title="Log Building Repair or Expense">
-                                <i class="fa fa-wrench me-1"/>Repair
-                            </button>
-                        </div>
+                        <details class="o_isg_quick_actions">
+                            <summary class="o_isg_btn o_isg_btn_sec" title="Create or open another operational task">
+                                <i class="fa fa-bolt me-1"/>Quick actions<i class="fa fa-chevron-down o_isg_quick_actions_chevron"/>
+                            </summary>
+                            <div class="o_isg_quick_actions_menu">
+                                <button type="button" t-on-click="() => this.openPos()"><i class="fa fa-desktop"/>Open Point of Sale</button>
+                                <button type="button" t-on-click="() => this.newPurchase()"><i class="fa fa-cube"/>Create purchase order</button>
+                                <button type="button" t-on-click="() => this.newLease()"><i class="fa fa-file-text-o"/>Create commercial lease</button>
+                                <button type="button" t-on-click="() => this.newUnit()"><i class="fa fa-building-o"/>Add building unit</button>
+                                <button type="button" t-on-click="() => this.newTrip()"><i class="fa fa-truck"/>Dispatch delivery vehicle</button>
+                                <button type="button" t-on-click="() => this.newExpense()"><i class="fa fa-wrench"/>Log repair or expense</button>
+                            </div>
+                        </details>
 
                         <div class="o_isg_toolbar_group">
                             <button t-if="state.isAdmin" type="button"
@@ -111,6 +104,10 @@
             </header>
 
             <div class="o_isg_body">
+
+                <div t-if="state.loading" class="o_isg_sync_notice" role="status">
+                    <i class="fa fa-refresh fa-spin"/>Updating Command Center data…
+                </div>
 
                 <!-- ============ DAILY SALES & CASH-UP REPORT ============ -->
                 <t t-if="state.dailyReport.open">
@@ -158,6 +155,13 @@
                         <t t-elif="state.dailyReport.data">
                             <t t-set="dr" t-value="state.dailyReport.data"/>
                             <t t-set="ds" t-value="dr.summary"/>
+
+                            <div t-if="dr.warnings and dr.warnings.length" class="alert alert-warning mx-3 mt-3" role="alert">
+                                <strong>Incomplete report:</strong> Some figures could not be loaded. Verify these sections before using this cash-up:
+                                <ul class="mb-0 mt-1">
+                                    <li t-foreach="dr.warnings" t-as="warning" t-key="warning"><t t-out="warning"/></li>
+                                </ul>
+                            </div>
 
                             <!-- 4-Column Daily KPI Summary -->
                             <div class="o_isg_stock_summary_strip">
@@ -2412,6 +2416,43 @@
                         </div>
                     </section>
                 </t>
+
+                <!-- ============ TODAY'S PRIORITIES ============ -->
+                <section class="o_isg_focus" aria-label="Today's priorities">
+                    <div class="o_isg_focus_head">
+                        <div>
+                            <div class="o_isg_focus_title">Today’s priorities</div>
+                            <div class="o_isg_focus_sub">Review the actions that need attention before moving on.</div>
+                        </div>
+                        <span class="o_isg_focus_date"><i class="fa fa-calendar-o me-1"/><t t-out="state.today"/></span>
+                    </div>
+                    <div class="o_isg_focus_items">
+                        <button type="button" t-attf-class="o_isg_focus_item {{ state.stockMgr.lowCount + state.stockMgr.outCount ? 'is_attention' : 'is_clear' }}" t-on-click="() => this.toggleStockManager(true)">
+                            <i t-attf-class="fa {{ state.stockMgr.lowCount + state.stockMgr.outCount ? 'fa-exclamation-circle' : 'fa-check-circle' }} o_isg_focus_icon"/>
+                            <span class="o_isg_focus_copy">
+                                <strong><t t-if="state.stockMgr.lowCount + state.stockMgr.outCount"><t t-out="state.stockMgr.lowCount + state.stockMgr.outCount"/> stock items need review</t><t t-else="">Stock is in good shape</t></strong>
+                                <small><t t-if="state.stockMgr.lowCount + state.stockMgr.outCount">Open Stock Manager to restock or adjust quantities.</t><t t-else="">No low or out-of-stock items reported.</t></small>
+                            </span>
+                            <i class="fa fa-arrow-right o_isg_focus_arrow"/>
+                        </button>
+                        <button type="button" t-attf-class="o_isg_focus_item {{ state.kpi.overdueCount ? 'is_attention' : 'is_clear' }}" t-on-click="() => this.toggleRentManager(true, 'overdue')">
+                            <i t-attf-class="fa {{ state.kpi.overdueCount ? 'fa-exclamation-circle' : 'fa-check-circle' }} o_isg_focus_icon"/>
+                            <span class="o_isg_focus_copy">
+                                <strong><t t-if="state.kpi.overdueCount"><t t-out="state.kpi.overdueCount"/> rent invoices are overdue</t><t t-else="">Rent collections are up to date</t></strong>
+                                <small><t t-if="state.kpi.overdueCount">Open Rent Manager to collect or follow up.</t><t t-else="">No overdue tenant balances reported.</t></small>
+                            </span>
+                            <i class="fa fa-arrow-right o_isg_focus_arrow"/>
+                        </button>
+                        <button type="button" class="o_isg_focus_item is_action" t-on-click="() => this.toggleDailyReport(true)">
+                            <i class="fa fa-bar-chart o_isg_focus_icon"/>
+                            <span class="o_isg_focus_copy">
+                                <strong>Review today’s cash-up</strong>
+                                <small>Sales, payments, rent collections, and expenses in one view.</small>
+                            </span>
+                            <i class="fa fa-arrow-right o_isg_focus_arrow"/>
+                        </button>
+                    </div>
+                </section>
 
                 <!-- ============ FINANCIAL KPI STRIP ============ -->
                 <div class="o_isg_kpis">

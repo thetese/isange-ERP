@@ -1658,6 +1658,7 @@ export class IsangeDashboard extends Component {
       <div class="meta">Currency: ${esc(cur)}</div>
     </div>
   </div>
+  ${(data.warnings || []).length ? `<div style="border:1px solid #f59e0b;background:#fffbeb;color:#92400e;padding:10px;margin:12px 0"><strong>INCOMPLETE REPORT:</strong> Some figures could not be loaded. Verify before using this cash-up.<ul>${data.warnings.map((warning) => `<li>${esc(warning)}</li>`).join("")}</ul></div>` : ""}
   <div class="grid">
     <div class="box"><span>Hardware Sales</span><strong>${this.fmt(s.hwTotal)} ${esc(cur)}</strong><small>${s.hwOrdersCount || 0} orders · Est. Profit ${this.fmt(s.hwProfit)} (${s.hwMarginPct || 0}%)</small></div>
     <div class="box"><span>Cash Collected</span><strong>${this.fmt(s.totalCashIn)} ${esc(cur)}</strong><small>Sales ${this.fmt(s.hwCashIn)} · Rent ${this.fmt(s.rentCashIn)}</small></div>
@@ -3800,8 +3801,8 @@ export class IsangeDashboard extends Component {
         this.actionService.doAction({
             type: "ir.actions.report",
             report_type: "qweb-pdf",
-            report_name: "sale.report_saleorder_pro_forma",
-            report_file: "sale.report_saleorder_pro_forma",
+            report_name: "isange_property_fleet.report_isange_proforma_sale_document",
+            report_file: "isange_property_fleet.report_isange_proforma_sale_document",
             context: {
                 active_id: soId,
                 active_ids: [soId],

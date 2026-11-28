@@ -336,8 +336,13 @@ class IsangeProperty(models.Model):
             for item in cart
         ]
 
+        rwf_currency = self.env.ref('base.RWF', raise_if_not_found=False)
         sale_order = self.env['sale.order'].create({
             'partner_id': partner_id,
+            # Quick Sale prices are entered in RWF.  Do not inherit a
+            # customer's USD pricelist, otherwise the printed pro-forma and
+            # resulting invoice misleadingly display dollar amounts.
+            'currency_id': rwf_currency.id if rwf_currency else self.env.company.currency_id.id,
             'order_line': order_lines,
         })
 
@@ -776,12 +781,16 @@ class IsangeProperty(models.Model):
         for lease in leases:
             period_date = lease.next_invoice_date or today
             # Double-billing protection: skip if an active invoice already exists for this lease + due date
-            existing = Move.search([
+            candidates = Move.search([
                 ('isange_lease_id', '=', lease.id),
                 ('move_type', '=', 'out_invoice'),
                 ('state', '!=', 'cancel'),
-                ('invoice_date_due', '=', period_date),
-            ], limit=1)
+            ])
+            period_marker = str(period_date)
+            existing = candidates.filtered(lambda move: (
+                move.invoice_date_due == period_date
+                or any(period_marker in (line.name or '') for line in move.invoice_line_ids)
+            ))[:1]
             if existing:
                 skipped_count += 1
             else:
@@ -843,6 +852,7 @@ class IsangeProperty(models.Model):
 
         currency_info = self.get_dashboard_currency_info()
         rates = currency_info.get('rates') or {}
+        warnings = []
 
         def _conv(amount, cur):
             if not cur:
@@ -935,8 +945,8 @@ class IsangeProperty(models.Model):
                         'source': 'Quick Sale / SO',
                         'status': status,
                     })
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Sales orders could not be loaded: %s') % str(exc))
 
         pos_cash_in = 0.0
         pos_momo_in = 0.0
@@ -1001,8 +1011,8 @@ class IsangeProperty(models.Model):
                             'source': 'POS Counter',
                             'status': 'Paid',
                         })
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('POS sales could not be loaded: %s') % str(exc))
 
         items_sold = sorted(
             [
@@ -1072,8 +1082,8 @@ class IsangeProperty(models.Model):
                             hw_momo_in += amt
                         else:
                             hw_bank_in += amt
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Payments could not be loaded: %s') % str(exc))
 
         # 3. Day's Outflows: Fleet Fuel, Fleet Maintenance, Property Repairs
         fuel_out = 0.0
@@ -1102,8 +1112,8 @@ class IsangeProperty(models.Model):
                         'detail': s.description or '',
                         'amount': amt,
                     })
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Fleet expenses could not be loaded: %s') % str(exc))
 
         try:
             with self.env.cr.savepoint():
@@ -1122,8 +1132,8 @@ class IsangeProperty(models.Model):
                         'detail': e.vendor_id.name if e.vendor_id else '',
                         'amount': amt,
                     })
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Property expenses could not be loaded: %s') % str(exc))
 
         # 4. 7-Day Hardware Sales Trend ending on target_date
         week_days = []
@@ -1156,8 +1166,8 @@ class IsangeProperty(models.Model):
                     if slot:
                         slot['total'] += _conv(so.amount_total, so.currency_id)
                         slot['orders'] += 1
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Weekly sales trend could not be loaded: %s') % str(exc))
         try:
             if 'pos.order' in self.env:
                 with self.env.cr.savepoint():
@@ -1172,8 +1182,8 @@ class IsangeProperty(models.Model):
                         if slot:
                             slot['total'] += _conv(po.amount_total, po.currency_id)
                             slot['orders'] += 1
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(_('Weekly POS trend could not be loaded: %s') % str(exc))
 
         week_max = max([d['total'] for d in week_days] + [1.0])
         for d in week_days:
@@ -1191,6 +1201,7 @@ class IsangeProperty(models.Model):
         return {
             'date': str(target_date),
             'dateLabel': target_date.strftime('%A, %d %B %Y'),
+            'warnings': warnings,
             'currency': currency_info.get('name') or 'RWF',
             'summary': {
                 'hwTotal': hw_total,

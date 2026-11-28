@@ -233,6 +233,80 @@
         gap: 6px;
     }
 
+    .o_isg_quick_actions {
+        position: relative;
+
+        > summary {
+            list-style: none;
+
+            &::-webkit-details-marker {
+                display: none;
+            }
+        }
+
+        &[open] > summary {
+            border-color: var(--isg-blue);
+            background: var(--isg-blue-tint);
+            color: var(--isg-blue-fg);
+        }
+    }
+
+    .o_isg_quick_actions_chevron {
+        margin-left: 3px;
+        font-size: 9px;
+        transition: transform 0.12s ease;
+    }
+
+    .o_isg_quick_actions[open] .o_isg_quick_actions_chevron {
+        transform: rotate(180deg);
+    }
+
+    .o_isg_quick_actions_menu {
+        position: absolute;
+        top: calc(100% + 7px);
+        right: 0;
+        z-index: 25;
+        width: 245px;
+        padding: 6px;
+        border: 1px solid var(--isg-border-strong);
+        border-radius: 9px;
+        background: var(--isg-surface);
+        box-shadow: var(--isg-shadow-md);
+
+        button {
+            width: 100%;
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 7px 9px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--isg-text);
+            font: inherit;
+            font-size: 12px;
+            font-weight: 550;
+            text-align: left;
+            cursor: pointer;
+
+            i {
+                width: 15px;
+                color: var(--isg-text-muted);
+                text-align: center;
+            }
+
+            &:hover {
+                background: var(--isg-surface-hover);
+                color: var(--isg-text-strong);
+
+                i {
+                    color: var(--isg-blue-fg);
+                }
+            }
+        }
+    }
+
     .o_isg_btn {
         height: 32px;
         padding: 0 12px;
@@ -1797,6 +1871,142 @@
     // ========================================================================
     // 4. FINANCIAL KPI STRIP
     // ========================================================================
+    .o_isg_sync_notice {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 12px;
+        padding: 6px 10px;
+        border: 1px solid var(--isg-blue-border);
+        border-radius: 7px;
+        background: var(--isg-blue-tint);
+        color: var(--isg-blue-fg);
+        font-size: 11.5px;
+        font-weight: 600;
+    }
+
+    .o_isg_focus {
+        margin-bottom: 18px;
+        border: 1px solid var(--isg-border);
+        border-radius: 10px;
+        background: var(--isg-surface);
+        box-shadow: var(--isg-shadow-sm);
+        overflow: hidden;
+    }
+
+    .o_isg_focus_head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--isg-border);
+    }
+
+    .o_isg_focus_title {
+        color: var(--isg-text-strong);
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .o_isg_focus_sub,
+    .o_isg_focus_date {
+        color: var(--isg-text-muted);
+        font-size: 11.5px;
+    }
+
+    .o_isg_focus_date {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .o_isg_focus_items {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .o_isg_focus_item {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border: 0;
+        border-right: 1px solid var(--isg-border);
+        background: var(--isg-surface);
+        color: var(--isg-text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:last-child {
+            border-right: 0;
+        }
+
+        &:hover {
+            background: var(--isg-surface-hover);
+        }
+
+        &.is_attention .o_isg_focus_icon {
+            background: var(--isg-amber-tint);
+            color: var(--isg-amber-fg);
+        }
+
+        &.is_clear .o_isg_focus_icon {
+            background: var(--isg-emerald-tint);
+            color: var(--isg-emerald-fg);
+        }
+
+        &.is_action .o_isg_focus_icon {
+            background: var(--isg-blue-tint);
+            color: var(--isg-blue-fg);
+        }
+    }
+
+    .o_isg_focus_icon {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .o_isg_focus_copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        strong {
+            color: var(--isg-text-strong);
+            font-size: 12px;
+            font-weight: 650;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        small {
+            display: -webkit-box;
+            overflow: hidden;
+            color: var(--isg-text-muted);
+            font-size: 11px;
+            line-height: 1.35;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+    }
+
+    .o_isg_focus_arrow {
+        margin-left: auto;
+        color: var(--isg-text-faint);
+        font-size: 11px;
+    }
+
     .o_isg_kpis {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
@@ -3426,8 +3636,36 @@
             padding: 12px 14px;
         }
 
+        .o_isg_toolbar {
+            width: 100%;
+        }
+
+        .o_isg_quick_actions_menu {
+            right: auto;
+            left: 0;
+        }
+
         .o_isg_body {
             padding: 14px 12px;
+        }
+
+        .o_isg_focus_head {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .o_isg_focus_items {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .o_isg_focus_item {
+            border-right: 0;
+            border-bottom: 1px solid var(--isg-border);
+
+            &:last-child {
+                border-bottom: 0;
+            }
         }
 
         .o_isg_kpis {
